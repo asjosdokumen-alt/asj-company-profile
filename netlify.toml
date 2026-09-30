@@ -1,0 +1,87 @@
+# ─── netlify.toml — asj-company-profile ──────────────────────────────────────
+#
+# Situs ini STATIS murni. Tidak ada Functions, tidak ada SSR, tidak ada
+# `@astrojs/netlify` — adapter itu sengaja dibuang dari `astro.config.mjs`
+# (alasannya tertulis di header config tersebut). Jadi deploy di sini hanya
+# butuh dua hal: perintah build dan folder publish. Tidak lebih.
+#
+# Build command sengaja `npm run build`, BUKAN `astro build`. Skrip itu
+# menjalankan dua langkah berurutan dan urutannya adalah bagian dari
+# kebenarannya: `astro build` dulu, baru `node scripts/build-sw-manifest.mjs`
+# yang menulis ulang daftar precache service worker dari artefak yang BARU SAJA
+# dibangun. Menjalankan `astro build` saja akan mengirim `sw.js` dengan blok
+# precache kosong dari `public/sw.js` — situsnya tetap hidup, tapi tidak lagi
+# benar-benar bisa dipakai offline. Ini bukan hipotesis: `public/sw.js` memang
+# menyimpan blok itu kosong justru supaya `astro dev` tetap jalan.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Sama dengan `.nvmrc`. Dipatok eksplisit karena image default Netlify tidak
+  # dijamin mengikuti `.nvmrc`, dan Astro 5 menuntut Node >= 18.
+  NODE_VERSION = "22"
+
+# ─── Header cache ────────────────────────────────────────────────────────────
+#
+# Tiga kelas aset, tiga perlakuan berbeda. Yang membedakan bukan selera, tapi
+# apakah nama berkasnya memuat hash konten atau tidak.
+
+# 1. Service worker. TIDAK BOLEH di-cache panjang.
+#    `public/sw.js` nama berkasnya tetap (tidak ber-hash) sementara isinya
+#    berubah setiap build. Kalau browser atau CDN menyajikannya dari cache,
+#    worker lama terus hidup, daftar precache baru tidak pernah terpasang, dan
+#    pengguna yang sudah pernah membuka situs akan tertahan di versi lama tanpa
+#    cara keluar selain hard-reload. `max-age=0` + `must-revalidate` memaksa
+#    Netlify memeriksa ulang setiap kali.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# 2. Aset ber-hash di `/_astro/*`. Nama berkasnya mengandung hash konten, jadi
+#    isi di balik satu URL tidak akan pernah berubah. Aman di-cache selamanya.
+[[headers]]
+  for = "/_astro/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# 3. Foto dan ikon di `/assets/*` dan `/icons/*`. Nama berkasnya TIDAK ber-hash
+#    — `galeri-mensetsu-pertanian-1.webp` akan tetap bernama itu walau isinya
+#    diganti. Karena itu `immutable` akan jadi jebakan: foto yang ditukar tidak
+#    akan pernah muncul pada pengunjung lama.
+#
+#    `max-age=0` di sini bukan pilihan malas, melainkan SYARAT agar service
+#    worker tetap benar. Handler fetch di `public/sw.js` melayani aset statis
+#    dengan pola stale-while-revalidate: cache dipakai lebih dulu, lalu
+#    di-refresh di belakangnya lewat `fetch(req)`. Panggilan `fetch` itu ikut
+#    melewati HTTP cache — jadi kalau header di sini memberi `max-age` panjang,
+#    "refresh" itu akan mengembalikan salinan basi dari cache browser sendiri
+#    dan SWR-nya berubah jadi cache biasa yang tidak pernah diperbarui.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# ─── Header keamanan ─────────────────────────────────────────────────────────
+#
+# Hanya yang aman untuk situs statis. CSP sengaja TIDAK dipasang di sini:
+# Astro meng-inline skrip kecil secara default, dan CSP ketat akan mematikan
+# halaman ini. Menambah CSP harus lewat pengukuran dulu, bukan tebakan.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# ─── 404 ─────────────────────────────────────────────────────────────────────
+# Tidak perlu konfigurasi: Netlify otomatis menyajikan `/404.html` di root
+# publish sebagai halaman tidak-ditemukan. `astro build` sudah menghasilkannya.

@@ -5,11 +5,39 @@
  * --------------------------------
  * This is the ONLY unauthenticated WRITE in the deployment. A visitor has no
  * account — that is the whole point of a company contact form, because requiring
- * one would mean only existing users could ask how to become one. The server side
- * of that decision (validation, length bounds, per-number rate limiting, the
- * honeypot, and why the reply is deliberately vague) lives in
- * `netlify/functions/contexts/contact/service.ts`; read that file for the
- * security reasoning. This file owns only what the visitor sees.
+ * one would mean only existing users could ask how to become one. This file owns
+ * only what the visitor sees.
+ *
+ * WHERE THE SUBMISSION GOES NOW — CHANGED 2026-09-30, AND WHY
+ * ----------------------------------------------------------
+ * It used to go to `netlify/functions/contexts/contact/service.ts`, which held
+ * the validation, the length bounds, the per-number rate limiting and the
+ * honeypot decision. THAT FILE IS NOT IN THIS REPO. `netlify/` is the portal's
+ * backend and the split deliberately left it behind (README, "Yang SENGAJA tidak
+ * dibawa"), so `apiClient` was posting to `/.netlify/functions/kirimPesanKontak`
+ * on a site that has no Functions — the form rendered correctly and failed on
+ * every submit. That is a live defect, not a theoretical one, and the README
+ * already listed "Netlify Forms" as the cheapest of the three available fixes.
+ *
+ * The owner chose it. So the POST now goes to `/` as
+ * `application/x-www-form-urlencoded` with a `form-name` field, which is how
+ * Netlify Forms receives an AJAX submission, and Netlify stores the entry and
+ * emails the site owner. No Function, no server to keep alive.
+ *
+ * WHAT THAT COSTS, STATED PLAINLY. The server used to enforce things the browser
+ * cannot: per-number rate limiting and length bounds that survive a crafted
+ * request. Those are GONE — anyone can POST to `/` directly with any body. What
+ * replaces them is Netlify's own spam filtering plus the honeypot below, and the
+ * validation in `submit()` is now a COURTESY to the visitor rather than a
+ * control: it stops an honest person typing a number we cannot call back, and
+ * stops nothing else. Do not read the `MAX` constants as enforcement.
+ *
+ * WHY THE FORM IS DETECTED AT ALL. Netlify's build bot scans the DEPLOYED HTML
+ * for forms; it does not run JavaScript. This island is mounted with
+ * `client:visible`, which Astro still server-renders, so the `<form>` and all
+ * five inputs are really present in `dist/index.html` — verified there, not
+ * assumed. A `client:only` directive here would have produced a form Netlify
+ * never sees, and every submission would 404. Do not change that directive.
  *
  * THE HONEYPOT, AND WHY ITS LABEL IS INVISIBLE RATHER THAN ABSENT
  * --------------------------------------------------------------
@@ -28,22 +56,25 @@
  *     blackholed — which is the one failure mode of a honeypot that actually
  *     harms someone.
  *
- * The `name` is `perusahaan` ("company"), which is plausible enough to attract a
- * bot that scrapes field names for something business-shaped, and is the exact
- * string `service.ts` reads via its `HONEYPOT_FIELD` constant.
+ * WHY THE HONEYPOT FIELD IS NAMED `perusahaan`, AND WHY NETLIFY AGREES
+ * -------------------------------------------------------------------
+ * The name is `perusahaan` ("company"), plausible enough to attract a bot that
+ * scrapes field names for something business-shaped. Netlify's own spam filter
+ * is told to watch that same field via `netlify-honeypot="perusahaan"` on the
+ * `<form>`, so the trap now has TWO jaws: this component short-circuits a filled
+ * honeypot client-side (below), and Netlify discards a submission whose honeypot
+ * arrived non-empty. The second one is the one that holds, because it does not
+ * depend on our JavaScript running.
  *
- * SESSION OPTIONS ARE NOT DEFAULTS, ON PURPOSE
- * -------------------------------------------
- * `apiClient` defaults to `requireAuth: true` and `onSessionInvalid: 'logout'`.
- * Left alone, an anonymous visitor would be REFUSED (no session) and then
- * redirected to `/` — so the form would look like it submitted and the page
- * would jump. Both are overridden for the obvious reason: this page is public.
- *
- * `silent: true` because this component owns its error presentation (inline
- * message + toast), and the client's own toast would otherwise double every
- * failure. `onSessionInvalid: 'throw'` rather than 'logout' for the same reason
- * the landing page's other public callers use it: a public visitor must never be
- * logged out or redirected by a background call.
+ * WHY THERE IS NO LONGER AN `apiClient` CALL HERE
+ * ----------------------------------------------
+ * `apiClient` defaults to `requireAuth: true` and `onSessionInvalid: 'logout'`,
+ * which had to be overridden because this page is public. All of that is moot
+ * now: the submission is a plain `fetch` to `/`, so there is no session to
+ * invalidate and no client-level toast to suppress. The import was removed
+ * rather than left dangling — `noUnusedImports` is on for `.tsx` in
+ * `biome.json`, and an unused import of the Supabase-backed client is exactly
+ * the kind of thing that quietly drags it back into the bundle.
  *
  * WHY A SUCCESS STATE RATHER THAN A RESET FORM
  * -------------------------------------------
@@ -55,15 +86,21 @@
  */
 import { useState } from 'preact/hooks';
 import { showToast } from '../Toast';
-import { apiClient } from '../../lib/apiClient';
 import { t, useLang } from '../../store/i18n';
 import Icon from '../ui/Icon';
 
-/** The server's answer. Both fields are optional because only `message` is guaranteed. */
-interface KirimPesanRes {
-  success?: boolean;
-  message?: string;
-}
+/**
+ * The name Netlify Forms files this submission under.
+ *
+ * The same string appears in three places that MUST agree: the `name` attribute
+ * on the `<form>`, the hidden `form-name` input, and the `form-name` field of
+ * the AJAX body. Netlify matches the POST to the form definition it discovered
+ * in the deployed HTML by this value, and a mismatch is silent — the request
+ * returns 200 and the entry simply never appears in the dashboard. Named once
+ * here so there is one place to be wrong, and the two attribute sites below
+ * interpolate it rather than repeating the literal.
+ */
+const FORM_NAME = 'kontak';
 
 interface Fields {
   nama: string;
@@ -77,17 +114,32 @@ interface Fields {
 const EMPTY: Fields = { nama: '', noWa: '', subjek: '', pesan: '', perusahaan: '' };
 
 /**
- * Client-side limits, mirroring `service.ts` (MAX_NAMA 120, MAX_WA 40,
- * MAX_SUBJEK 160, MAX_PESAN 4000).
+ * Client-side limits, carried over from the portal's `service.ts`
+ * (MAX_NAMA 120, MAX_WA 40, MAX_SUBJEK 160, MAX_PESAN 4000).
  *
- * Kept in sync with the server deliberately, and duplicated rather than shared:
- * the server file is bundled for a Node/Netlify runtime and this one for the
- * browser, and a shared constant would pull the whole service module (and its
- * database imports) into the client bundle. The duplication is bounded to four
- * numbers, and the server is the authority — these `maxLength` attributes stop a
- * visitor typing something that would be rejected, they do not enforce anything.
+ * ⚠ THESE ARE NO LONGER ENFORCEMENT. They used to mirror a server that rejected
+ * an over-long field; that server is not in this repo (see the header), so
+ * nothing downstream rejects anything. What is left is a `maxLength` on the
+ * input, which is a courtesy to the visitor — it stops someone pasting a
+ * paragraph into the subject line and losing it — and no obstacle whatsoever to
+ * a crafted POST. Kept at the original numbers so a future move back to a real
+ * backend does not have to re-derive them from the printed profile.
  */
 const MAX = { nama: 120, noWa: 40, subjek: 160, pesan: 4000 } as const;
+
+/**
+ * A deliberately loose WhatsApp/phone shape: a digit or `+` first, then digits
+ * and the separators a person actually types.
+ *
+ * WHY LOOSE. The server used to own this rule and it is gone, so the only job
+ * left is catching a typo a human would want caught — a letter where a digit
+ * belongs. Anything stricter starts rejecting numbers this company can really be
+ * reached on: `+81 90-1234-5678`, `0812-3456-7890`, `(0352) 123456` and a
+ * leading country code `62` are all real. A rejected honest enquiry is a worse
+ * failure than an accepted malformed one, because only the second is visible to
+ * the owner and fixable by a reply.
+ */
+const WA_SHAPE = /^[+(\d][\d\s()+.-]{6,}$/;
 
 /**
  * The shared class for the four text fields.
@@ -130,34 +182,65 @@ export default function ContactForm() {
     // honest path reports — a bot that gets an error learns to retry, a bot that
     // gets "sent" does not. Nothing is transmitted, so this costs one round trip
     // less than the real path.
+    //
+    // This is the SECOND jaw of the trap, not the only one. The `<form>` also
+    // carries `netlify-honeypot="perusahaan"`, so a bot that posts straight to
+    // `/` — skipping this handler entirely — is discarded by Netlify instead.
     if (f.perusahaan.trim() !== '') {
       setSent(true);
+      return;
+    }
+
+    // Validation, for the visitor's benefit only (see the MAX note above).
+    // `noValidate` is on the form, so the browser will NOT do this for us — and
+    // that is the right call here, because the page has its own language toggle
+    // while native validation messages follow the BROWSER's locale. A JP reader
+    // on an ID browser would otherwise get ID errors from Chrome and JP errors
+    // from this component, in the same form.
+    if (!f.nama.trim() || !f.noWa.trim() || !f.subjek.trim() || !f.pesan.trim()) {
+      const msg = t('contact.err_required');
+      setError(msg);
+      showToast(msg, 'error');
+      return;
+    }
+    if (!WA_SHAPE.test(f.noWa.trim())) {
+      const msg = t('contact.err_wa');
+      setError(msg);
+      showToast(msg, 'error');
       return;
     }
 
     setError('');
     setSending(true);
     try {
-      // Order is the contract: `service.ts` destructures
-      // `[nama, wa, subjek, pesan, honeypot]` positionally.
-      const res = await apiClient<KirimPesanRes>(
-        'kirimPesanKontak',
-        [f.nama, f.noWa, f.subjek, f.pesan, f.perusahaan],
-        { requireAuth: false, onSessionInvalid: 'throw', silent: true },
-      );
-      if (res && res.success === false) {
-        // The server's own message is written for the visitor and is more
-        // specific than anything this component could guess ("Nomor WhatsApp
-        // wajib diisi..." vs a generic failure), so show it verbatim.
-        setError(res.message || t('contact.failed'));
-        return;
-      }
+      // Netlify Forms over AJAX: a url-encoded body POSTed to `/`, with
+      // `form-name` naming the form definition Netlify found in the deployed
+      // HTML. The content type is NOT optional — Netlify parses url-encoded and
+      // multipart bodies, and a JSON body is not read as a submission at all.
+      //
+      // The honeypot is deliberately absent from the body. It is empty for every
+      // human, and Netlify reads a MISSING honeypot field the same as an empty
+      // one; sending it would only add a field for a scraper to notice.
+      const body = new URLSearchParams({
+        'form-name': FORM_NAME,
+        nama: f.nama,
+        no_wa: f.noWa,
+        subjek: f.subjek,
+        pesan: f.pesan,
+      });
+      const res = await fetch('/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      if (!res.ok) throw new Error(t('contact.failed'));
       setSent(true);
       setF(EMPTY);
     } catch (err) {
-      // `apiClient` throws on non-2xx and carries the server's message on the
-      // Error (see its `!res.ok` branch). Falling back to the generic string
-      // keeps a parse failure from replacing one error with a vaguer one.
+      // Netlify answers an accepted submission with a 2xx, so a non-2xx here
+      // means the POST itself failed — offline, blocked, or a 5xx. There is no
+      // server message to surface any more, so the generic string IS the answer
+      // rather than a fallback from something more specific.
       const msg = err instanceof Error && err.message ? err.message : t('contact.failed');
       setError(msg);
       showToast(msg, 'error');
@@ -189,7 +272,34 @@ export default function ContactForm() {
   const idOf = (k: string) => `kontak-${k}`;
 
   return (
-    <form onSubmit={submit} noValidate class="flex flex-col gap-4">
+    <form
+      name={FORM_NAME}
+      onSubmit={submit}
+      method="POST"
+      action="/"
+      data-netlify="true"
+      netlify-honeypot="perusahaan"
+      noValidate
+      class="flex flex-col gap-4"
+    >
+      {/* ── The Netlify Forms contract, in one place ────────────────────────
+          `data-netlify="true"` plus a `name` are what Netlify's build bot looks
+          for while scanning the DEPLOYED HTML. Without them no form called
+          `kontak` is ever registered, and the AJAX POST below is answered with a
+          200 and silently discarded — the worst failure shape there is, because
+          nothing looks broken.
+
+          `method` and `action` are not decoration. They are the NO-JAVASCRIPT
+          path: this island hydrates on scroll, so a visitor who submits before
+          the bundle arrives — or with JS disabled — gets a real browser POST
+          instead of a dead button. That path reaches the right form only because
+          the hidden `form-name` input below travels with it.
+
+          `netlify-honeypot="perusahaan"` names the field Netlify's spam filter
+          watches. It MUST match the honeypot input further down; a mismatch
+          makes the filter watch a field that does not exist, which is a trap
+          that never fires and never reports. */}
+      <input type="hidden" name="form-name" value={FORM_NAME} />
       <div class="grid gap-4 sm:grid-cols-2">
         <label class="flex flex-col gap-1.5" for={idOf('nama')}>
           <span class="text-caption font-bold uppercase text-fg" data-lang="contact.field_nama">

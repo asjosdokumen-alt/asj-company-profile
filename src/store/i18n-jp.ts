@@ -1094,6 +1094,11 @@ export const jpTranslations: Record<string, string> = {
   // matches `"key": "value"` textually, so a wrapped value reads as missing.
   "contact.sent_body": "担当者より営業日にWhatsAppにてご連絡いたします。お急ぎの場合は、右記の番号までお電話ください。",
   "contact.failed": "送信できませんでした。もう一度お試しいただくか、WhatsAppにてご連絡ください。",
+  // クライアント側バリデーション — Netlify Forms への移行に伴い 2026-09-30 追加。
+  // 元はサーバー側が持っていたメッセージだが、そのサーバーはこのリポジトリに無い。
+  // `id` 辞書と同じ理由で 1 行：カバレッジ検査は `"key": "value"` をテキストで照合する。
+  "contact.err_required": "お名前・WhatsApp番号・件名・メッセージをすべてご入力ください。",
+  "contact.err_wa": "WhatsApp番号の形式が正しくありません。例：0812-3456-7890",
   "contact.privacy": "お返事は営業日にWhatsAppにてお送りします。",
 
   // ── ページ内ナビゲーション（ランディングページ L4） ──────────────────

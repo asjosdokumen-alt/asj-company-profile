@@ -104,21 +104,34 @@ sebenarnya milik portal:
   tautannya menuju 404.
 - **`zod`** (lewat `schemas.ts`) dan `src/lib/fcm.ts`.
 
-### ⚠️ Form kontak tidak punya backend
+### ✅ Form kontak — SELESAI 2026-09-30, lewat Netlify Forms
 
-`src/components/public/ContactForm.tsx` mengirim lewat `apiClient`, yang menuju
-`/.netlify/functions/*` — dan Functions **tidak ada di repo ini**. Formulirnya
-akan merender dengan benar dan gagal saat dikirim.
+Catatan ini dulu berbunyi "tidak punya backend" dan itu benar sampai
+2026-09-30: `ContactForm.tsx` mengirim lewat `apiClient` ke
+`/.netlify/functions/kirimPesanKontak`, sementara `netlify/` sengaja tidak
+dibawa dari portal. Formulirnya merender dengan benar dan gagal di setiap
+pengiriman.
 
-Pilihan yang tersedia, semuanya keputusan pemilik:
+Pemilik memilih opsi 1 dari tiga pilihan yang dulu tercantum di sini. Sekarang
+formulirnya POST url-encoded ke `/` dengan field `form-name`, yang merupakan
+cara Netlify Forms menerima kiriman AJAX. `<form>` membawa
+`data-netlify="true"`, `name="kontak"`, dan `netlify-honeypot="perusahaan"`.
 
-1. **Netlify Forms** — tambahkan atribut `netlify` pada `<form>`; Netlify
-   menangkapnya tanpa function. Paling murah untuk situs statis.
-2. **Arahkan ke backend portal** — setel `FUNCTIONS_PROXY_TARGET`-nya, tapi itu
-   berarti situs ini bergantung pada situs lain yang hidup.
-3. **Ganti dengan WhatsApp** — halaman ini sudah menautkan WA di beberapa tempat.
+Dua hal yang ikut berubah dan perlu diketahui:
 
-Sampai salah satu dipilih, form ini **jangan dianggap berfungsi**.
+- **Validasi pindah ke klien.** Server portal yang dulu memaksa batas panjang
+  dan **rate limit per nomor** tidak ada di sini, jadi keduanya hilang. Yang
+  tersisa: penyaring spam Netlify + honeypot, dan validasi di `submit()` yang
+  sopan-santun ke pengunjung, bukan kontrol. Dua kunci i18n baru
+  (`contact.err_required`, `contact.err_wa`) menampung pesannya.
+- **Form ini harus tetap ter-SSR.** Netlify mendeteksi form dengan memindai HTML
+  yang di-deploy, bukan dengan menjalankan JavaScript. `client:visible` tetap
+  di-SSR Astro sehingga markup-nya benar-benar ada di `dist/index.html` —
+  diperiksa di sana, bukan diasumsikan. Mengubahnya ke `client:only` akan
+  menghasilkan form yang tidak pernah dilihat Netlify.
+
+Panduan deploy lengkapnya, termasuk cara mengaktifkan notifikasi email:
+**`docs/DEPLOY_NETLIFY.md`**.
 
 ---
 
@@ -146,9 +159,19 @@ wajah baru tanpa keputusan itu.**
 
 ## Status deploy
 
-Belum di-deploy ke mana pun. Portal asalnya (`asjastro.netlify.app`) **beku sejak
-2026-09-24** karena kredit akun Netlify habis — setiap deploy setelahnya
-di-skip. Repo ini dibuat lebih dulu, dan alamatnya ditentukan kemudian.
+**Siap deploy, belum di-deploy.** Konfigurasinya sudah ada dan sudah di-commit:
+`netlify.toml` di root memuat perintah build, folder publish, versi Node, dan
+seluruh header cache — jadi dashboard Netlify tidak perlu diisi manual.
+
+Portal asalnya (`asjastro.netlify.app`) **beku sejak 2026-09-24** karena kredit
+akun Netlify habis; setiap deploy setelahnya di-skip. Karena itu situs ini
+disiapkan untuk **akun Netlify dengan alamat email baru** dan kuota yang mulai
+dari nol, bukan menumpang akun yang sudah mentok.
+
+Langkah berikutnya, berurutan, ada di **`docs/DEPLOY_NETLIFY.md`** — termasuk
+alasan `PUBLIC_SITE_URL` baru boleh diisi **setelah** deploy pertama (nilainya
+dibaca saat build, dan canonical yang menunjuk origin yang salah lebih buruk
+daripada tidak ada canonical).
 
 ---
 
@@ -171,6 +194,9 @@ public/
 docs/
   COMPANY_PROFILE_DATA.md    data resmi perusahaan + aturan §11.2
   ILLUSTRATION_SPEC.md       spek ukuran & isi ilustrasi
+  DEPLOY_NETLIFY.md          panduan deploy ke Netlify, langkah demi langkah
+netlify.toml                 konfigurasi build + header cache (sumber kebenaran,
+                             bukan dashboard Netlify)
 scripts/
   build/strip-html-comments.mjs   pangkas komentar HTML dari build produksi
   build-sw-manifest.mjs           tulis ulang precache service worker

@@ -1477,6 +1477,13 @@ export const translations: Record<Lang, Record<string, string>> = {
   // other eleven in the same block passed. Do not prettier-wrap it.
   "contact.sent_body": "Tim kami akan menindaklanjuti melalui WhatsApp pada hari kerja. Jika Anda memerlukan jawaban lebih cepat, silakan menghubungi nomor yang tertera di samping.",
   "contact.failed": "Pesan gagal dikirim. Silakan coba lagi atau hubungi kami melalui WhatsApp.",
+  // Validasi sisi klien — DITAMBAHKAN 2026-09-30 bersama perpindahan ke Netlify
+  // Forms. Server yang dulu memiliki kedua pesan ini tidak ada di repo ini, jadi
+  // formulirnya harus memproduksinya sendiri. Keduanya satu baris dengan alasan
+  // yang sama seperti `contact.sent_body`: gate cakupan membaca `"key": "value"`
+  // secara tekstual, sehingga nilai yang terlipat terbaca sebagai kunci tanpa nilai.
+  "contact.err_required": "Mohon lengkapi kolom Nama, Nomor WhatsApp, Subjek, dan Pesan.",
+  "contact.err_wa": "Nomor WhatsApp tidak valid. Contoh: 0812-3456-7890.",
   "contact.privacy": "Balasan dikirim melalui WhatsApp pada hari kerja.",
 
   // ── Navigasi section (landing page L4) ────────────────────────────────
