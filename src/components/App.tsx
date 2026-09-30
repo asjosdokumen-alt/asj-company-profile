@@ -1,72 +1,69 @@
 /**
- * App.tsx - Header + Mobile Nav with i18n (Preact island)
+ * App.tsx — the landing page's header, its navigation drawer, and the hero.
  *
- * Initializes Supabase auth listener at boot (useEffect).
- * All 11 consumers continue to import authStore from authReactive.ts — no breakage.
+ * WHAT THIS FILE USED TO BE, AND WHY IT IS NOT ANY MORE
+ * ----------------------------------------------------
+ * It was the portal's app shell: a Supabase auth store, a login modal, a
+ * registration modal, an admin AI copilot, a candidate-check modal, and a
+ * bottom nav — plus a second, NON-hero header variant whose artwork was fetched
+ * from the portal's Supabase Storage bucket on every page load.
+ *
+ * None of that survives, and the reason is not tidiness. Every one of those
+ * features needs a backend that this repo does not have:
+ *
+ *   · the modals posted to `/.netlify/functions/*`, and `netlify/` was left
+ *     behind on purpose — the same defect the contact form had (see
+ *     `public/ContactForm.tsx`);
+ *   · the auth store initialised a Supabase client with no project URL, so the
+ *     build printed "[Supabase] Auth features will be disabled" and the whole
+ *     surface was inert while still shipping 56.5 KB to every visitor.
+ *
+ * So they were REMOVABLE, not merely unused: measured by deleting them and
+ * watching the build stay green, not by guessing from the import graph.
+ *
+ * WHY THE `hero` PROP IS GONE. It selected between two headers, and only one
+ * was ever reachable: `index.astro` mounts `<App client:load hero />` and that
+ * is the component's ONLY consumer — `404.astro` does not mount it at all. The
+ * non-hero branch existed for `/loker`, `/admin`, `/candidate` and `/share`,
+ * none of which exist in this repo. It is deleted rather than kept as an
+ * unreachable option, and with it the Supabase banner artwork, `bannerStore`
+ * and the hydration workaround that branch needed.
+ *
+ * THE DRAWER LINKS TO SECTIONS THAT EXIST. It used to link to `/loker`,
+ * `/candidate`, `/admin` and `/public` — four routes this repo does not build,
+ * so every one of them was a 404 dressed as navigation. The list below is the
+ * page's own anchors, taken from `index.astro`, and nothing else.
  */
 import { useState, useEffect, useLayoutEffect, useRef } from 'preact/hooks';
-import { useStore } from '@nanostores/preact';
-import { authStore, logout } from '../store/authReactive';
-import { initializeAuthListener, logoutSupabase } from '../store/userStore';
-import { toggleLang, t, translateDataLang, useLang } from '../store/i18n';
-import { bannerStore } from '../store/theme';
-
-/* STACKING ORDER COMES FROM THE THEME SCALE (theme.css `@theme`), NOT A SECOND
-   PRIVATE COPY. This file used to carry its own `Z_INDEX` map (scrim 35,
-   drawer 40, hamburger 30), which contradicted the theme's scale and put the
-   drawer's scrim BELOW any `z-sticky` element (50): a sticky section bar stayed
-   bright on top of the dimmed page and could paint over the drawer itself. The
-   scrim now uses `z-scrim` (95) and the drawer `z-drawer` (100) — both above
-   sticky page content, drawer above scrim — so the next sticky element cannot
-   reproduce the defect. */
-
-/**
- * The header banner artwork (non-hero variant), restored 2026-09-25.
- *
- * WHY THIS IS BACK. The non-hero header (`/public`, `/loker`, `/share`, …) had
- * lost its banner: `bannerStore` was imported and never read, so every route
- * except the hero on `/` rendered a bare `hero-gradient` with no artwork. The
- * owner's item 3 asks for the banner asset back on the `asj-files` Supabase path
- * the legacy portal used.
- *
- * WHY THESE EXACT STRINGS. They are the legacy structure the owner chose, and
- * both filenames are ALREADY live in this repo — `LayananSection.astro:31,114`
- * fetch `sakra_banner.webp` and `dark_tokyo_banner.webp` from this same base.
- * Reusing them (rather than inventing names) keeps one source of truth for the
- * URLs; `sakra` is the legacy spelling and must NOT be "corrected" to `sakura`,
- * or the request 404s.
- *
- * WHY THE MAP DEFAULT IS TOKYO. `BannerTheme` also has `INTER_VIP`; anything
- * that is not `SAKURA` resolves to the Tokyo artwork, matching the legacy
- * default. `bannerStore` is a `persistentAtom`, so flipping the theme swaps the
- * artwork — which is the whole reason the store exists.
- */
-const BANNER_BASE =
-  'https://gdwvffmevwtwnzrapjwy.supabase.co/storage/v1/object/public/asj-files/assets/';
-const BANNER_ART = {
-  SAKURA: `${BANNER_BASE}sakra_banner.webp`,
-  TOKYO: `${BANNER_BASE}dark_tokyo_banner.webp`,
-} as const;
-
-import LoginModal from './LoginModal';
-// CekSiswaModal dipakai saat render (flag showCekSiswa) tetapi impornya hilang
-// → ReferenceError begitu modal dibuka. Jangan hapus baris ini.
-import CekSiswaModal from './CekSiswaModal';
-import AdminAiCopilot from './admin/AdminAiCopilot';
+import { toggleLang, t, useLang } from '../store/i18n';
 import { showToast } from './Toast';
 import Icon from './ui/Icon';
-import { useOverlayPresence } from './ui/useOverlayPresence';
 import { ErrorBoundary } from './ErrorBoundary';
 
-/** User state from auth store */
-interface UserState {
-  isLoggedIn: boolean;
-  role: "admin" | "kandidat" | null;
-  name: string;
-  wa: string;
-}
-
-type ModalMode = 'closed' | 'login' | 'daftar';
+/**
+ * The drawer's section list — and the ONLY hrefs in this file.
+ *
+ * WHY IT IS NOT DERIVED FROM `index.astro`. The page composes its sections in
+ * an `.astro` file and this is a Preact island; there is no shared module
+ * between them without inventing one, and a generated list would need a build
+ * step for nine strings. What keeps the two in sync instead is that the ids
+ * here are checked against the page — a mismatch is a dead anchor, which is the
+ * defect this list was written to remove, so it is worth re-checking by grep
+ * whenever a section id changes:
+ *
+ *     grep -oE 'id="[^"]*"' src/pages/index.astro
+ */
+const NAV: ReadonlyArray<{ href: string; key: string }> = [
+  { href: '#layanan', key: 'nav.layanan' },
+  { href: '#program', key: 'nav.program' },
+  { href: '#alur', key: 'nav.alur' },
+  { href: '#galeri', key: 'nav.galeri' },
+  { href: '#legalitas', key: 'nav.legal' },
+  { href: '#tim', key: 'nav.tim' },
+  { href: '#mitra', key: 'nav.mitra' },
+  { href: '#faq', key: 'nav.faq' },
+  { href: '#kontak', key: 'nav.kontak' },
+];
 
 /**
  * Hero statistics — the three the company profile actually proves.
@@ -80,7 +77,7 @@ type ModalMode = 'closed' | 'login' | 'daftar';
  * — Miyazaki, Okayama, Nagano, Kagoshima (pages 13-14).
  *
  * When the owner supplies the real counts, a fourth tile is added here and the
- * grid already accommodates it (`lg:grid-cols-1` stacks any number).
+ * grid already accommodates it (`sm:grid-cols-3` is a row, not a fixed count).
  */
 const HERO_STATS: ReadonlyArray<{ value: string; labelKey: string }> = [
   { value: '2023', labelKey: 'profile.stat_since' },
@@ -88,105 +85,19 @@ const HERO_STATS: ReadonlyArray<{ value: string; labelKey: string }> = [
   { value: '4', labelKey: 'profile.stat_prefectures' },
 ];
 
-export default function App(
-  { showHeader = true, hero = false }: { showHeader?: boolean; hero?: boolean } = {},
-) {
-  const u: UserState = useStore(authStore) as UserState;
+export default function App() {
   // useLang() re-renders once the lazy JP dict lands (e.g. a cold load with
   // lang=jp) so every t() consumer in this subtree stops showing the Indonesian
   // fallback — the same subscription every island root needs.
   const lang = useLang();
-  // Banner artwork follows the persisted banner theme (light → SAKURA,
-  // dark → TOKYO). Subscribing here is what makes a theme flip swap the
-  // non-hero header's picture; without it the import was dead and every
-  // non-hero route rendered a bare gradient.
-  //
-  // ⚠ WHY AN IMPERATIVE SYNC IS STILL NEEDED (MEASURED 2026-09-25).
-  // `useStore(bannerStore)` DOES re-render on every *change* after hydration —
-  // toggling the theme in-page swaps the <img> src correctly. It does NOT fix
-  // the FIRST paint: the page is server-rendered with the SAKURA default (the
-  // server has no `localStorage`), and on hydration Preact REUSES that SSR
-  // <img> without patching its `src`, because the client's first render also
-  // produced a vnode whose props Preact considers already-present. With a
-  // persisted dark theme the header therefore stayed on `sakra_banner.webp`
-  // after reload. Adding a `key` did not help (Preact ignores key diffs on the
-  // hydration commit). The measured fix is to write the correct src once the
-  // island is live: the effect below runs on mount (fixing the first paint) and
-  // again on every `banner` change (covering later flips), so it also makes the
-  // subscription's re-render robust against the same no-op diff.
-  const banner = useStore(bannerStore);
-  const bannerSrc = banner === 'SAKURA' ? BANNER_ART.SAKURA : BANNER_ART.TOKYO;
-  const bannerImgRef = useRef<HTMLImageElement | null>(null);
-  useLayoutEffect(() => {
-    const el = bannerImgRef.current;
-    if (el && el.getAttribute('src') !== bannerStore.get()) {
-      el.setAttribute('src', bannerStore.get() === 'SAKURA' ? BANNER_ART.SAKURA : BANNER_ART.TOKYO);
-    }
-  }, [banner]);
-  const [modalMode, setModalMode] = useState<ModalMode>('closed');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showAiCopilot, setShowAiCopilot] = useState(false);
-  const [showCekSiswa, setShowCekSiswa] = useState(false);
-  /* Exit window (2026-09-28) — see `useOverlayPresence`. LoginModal is NOT
-     here: it is mounted unconditionally and owns its own presence. */
-  const cekSiswaP = useOverlayPresence(showCekSiswa);
-  const aiCopilotP = useOverlayPresence(showAiCopilot);
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => { setHydrated(true); }, []);
-  // Hero background is now a CSS gradient (`.hero-gradient` class in global.css)
-  // instead of external Supabase images. The old `HEADER_BGS` map, its
-  // `bannerStore` listener, and the `asj-theme-change` plumbing are removed —
-  // the gradient switches automatically via the `--hero-gradient` custom
-  // property in theme.css, keyed off `data-theme` on `<html>`.  This eliminates
-  // three external image fetches (113–150 KB each), a CDN dependency, and the
-  // footer/header artwork-lag bug that Footer.astro's comment records.
 
-  // Initialize Supabase auth listener once at boot
-  useEffect(() => { translateDataLang();
-    const cleanup = initializeAuthListener();
-    return cleanup;
-  }, []);
-
-  function openLogin() { setModalMode("login"); setMenuOpen(false); window.dispatchEvent(new Event("asj-kandidat-login")); }
-  function openAdminLogin() { setModalMode("login"); setMenuOpen(false); window.dispatchEvent(new Event("asj-admin-login")); }
-  function openRegister() { setModalMode("daftar"); setMenuOpen(false); }
-  function closeModal() { setModalMode("closed"); }
-  async function handleLogout() { await logoutSupabase(); window.location.reload(); }
-  function toggleMenu() { setMenuOpen(!menuOpen); }
-  // Theme lives in store/theme.ts. Its subscriber writes `data-theme` +
-  // the legacy `.light` class, moves the banner artwork, and fires
-  // `asj-theme-change` (which the headerBg effect above listens for).
-  useEffect(() => {
-    const handler = () => setShowCekSiswa(true);
-    window.addEventListener("openCekSiswaModal", handler);
-    return () => window.removeEventListener("openCekSiswaModal", handler);
-  }, []);
-  /* The closing CTA band is static Astro and cannot reach this island's state, so
-     it fires an event instead — the same pattern the drawer buttons already use
-     (`asj-kandidat-login`). Without a listener the band's "Daftar Pelamar" button
-     would look live and do nothing, which is the worst of both worlds. */
-  useEffect(() => {
-    const handler = () => { setModalMode("daftar"); setMenuOpen(false); };
-    window.addEventListener("asj-kandidat-register", handler);
-    return () => window.removeEventListener("asj-kandidat-register", handler);
-  }, []);
-  /* The desktop section nav (`SiteNav.astro`) is static Astro too, and it fires
-     this same `asj-kandidat-login` event. Until this listener existed the nav's
-     "Login Pelamar" button dispatched into the void: only App owns `modalMode`,
-     and `LoginModal`'s own listener for this event merely resets its internal
-     admin step — it cannot open the modal. The drawer's identically labelled
-     button worked because it calls `openLogin()` directly, which BOTH sets the
-     state and dispatches this event; so the dispatch is a notification, not a
-     trigger, and every dispatcher needs a listener here.
-     DO NOT call `openLogin()` inside this handler — it dispatches
-     `asj-kandidat-login` itself, so that would recurse without end. */
-  useEffect(() => {
-    const handler = () => { setModalMode("login"); setMenuOpen(false); };
-    window.addEventListener("asj-kandidat-login", handler);
-    return () => window.removeEventListener("asj-kandidat-login", handler);
-  }, []);
-
-  function installApp() { showToast("Install: Chrome > Menu > Home Screen", "info"); setMenuOpen(false); }
+  function toggleMenu() { setMenuOpen((v) => !v); }
+  function closeMenu() { setMenuOpen(false); }
+  function installApp() {
+    showToast('Install: Chrome > Menu > Home Screen', 'info');
+    setMenuOpen(false);
+  }
 
   /* ─── Drawer keyboard contract ────────────────────────────────────────
      MEASURED 2026-09-16 on the built artifact at 390x844, BEFORE this block
@@ -195,29 +106,28 @@ export default function App(
        CLOSED (fresh load)      nav rect.x = 390 = viewport width, i.e. fully
                                 off-screen; aria-hidden null; inert false.
                                 Tab-walk from the hamburger: 7 of 22 stops
-                                landed INSIDE the closed drawer (Close,
-                                Install App, Bahasa, Login, Daftar, Admin
-                                Login). The ring is painted off-screen, so
-                                the user sees nothing happen and has to Tab
-                                through six invisible controls.
+                                landed INSIDE the closed drawer. The ring is
+                                painted off-screen, so the user sees nothing
+                                happen and has to Tab through six invisible
+                                controls.
        Escape while open        no effect (nav still at rect.x = 102)
        Tab while open           19 of 30 stops escaped to the page BEHIND,
                                 where the ring lands under the 288 px drawer
        body[inert]              false; [aria-modal] count 0
 
      Three fixes, all of them the drawer's OWN contract. The page behind is
-     deliberately NOT made inert: App renders a fragment and does not own
-     the page content, and the scrim already makes the background
-     pointer-inert — so keyboard-inerting it is a product decision, reported
-     rather than taken silently (see docs/UI_DESIGN_REVIEW.md). */
+     deliberately NOT made inert: App renders a fragment and does not own the
+     page content, and the scrim already makes the background pointer-inert —
+     so keyboard-inerting it is a product decision, reported rather than taken
+     silently. */
   const drawerRef = useRef<HTMLElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
 
   /* `inert` in a LAYOUT effect, not a deferred one: under useEffect the
      attribute lands a frame after paint, which leaves a window where the
-     drawer is visually closed but still holds six Tab stops — the exact
-     defect this closes. `inert` covers the accessibility tree too, so no
-     separate `aria-hidden` is written. */
+     drawer is visually closed but still holds six Tab stops — the exact defect
+     this closes. `inert` covers the accessibility tree too, so no separate
+     `aria-hidden` is written. */
   useLayoutEffect(() => {
     const el = drawerRef.current;
     if (el) el.inert = !menuOpen;
@@ -227,16 +137,12 @@ export default function App(
     if (!menuOpen) return;
     const el = drawerRef.current;
 
-    // Focus moves INTO the drawer on open. Without this the ring stays on
-    // the hamburger, which the open drawer (288 of 390 px) then covers.
+    // Focus moves INTO the drawer on open. Without this the ring stays on the
+    // hamburger, which the open drawer (288 of 390 px) then covers.
     el?.querySelector<HTMLElement>('button, a[href]')?.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      // Capture phase + stopImmediatePropagation, so the drawer wins over a
-      // widget inside it. It can never race useOverlay's identical handler:
-      // every path that opens a modal from the drawer also closes it.
-      e.stopImmediatePropagation();
       setMenuOpen(false);
     };
     document.addEventListener('keydown', onKeyDown, true);
@@ -245,14 +151,8 @@ export default function App(
       document.removeEventListener('keydown', onKeyDown, true);
       // Return focus to the trigger — but ONLY when it is about to be lost,
       // i.e. still inside the drawer, or already fallen to <body> (writing
-      // `inert` blurs whatever was inside it).
-      //
-      // That guard is what stops this fighting the modals. The drawer's
-      // "Login"/"Daftar"/"Admin Login" buttons close the drawer AND open a
-      // modal, whose own initial-focus effect lands in the same commit. If
-      // the modal focused first, activeElement is inside the modal and this
-      // does nothing; if it focused second, it wins. Either order ends on
-      // the modal, which is the only acceptable outcome.
+      // `inert` blurs whatever was inside it). Without this guard the ring
+      // would be yanked out of a control the visitor had just focused.
       const active = document.activeElement as HTMLElement | null;
       const lost = !active || active === document.body || !!el?.contains(active);
       const trigger = hamburgerRef.current;
@@ -260,474 +160,246 @@ export default function App(
     };
   }, [menuOpen]);
 
-  /* One logo element for both header variants.
-     It used to be written twice — once per branch — which meant two copies of the
-     inline error handler, and the second copy cost a `noExplicitAny` diagnostic on
-     a file that is already at its ratchet ceiling (measured: lint-ratchet reported
-     "src/components/App.tsx: 17 -> 20" with noExplicitAny +1). Lifting it into one
-     const keeps the count where it was and removes the chance of the two copies
-     drifting. The size is the EXISTING one, so every route that already renders
-     this header is unchanged; only the new hero variant adopts it.
-
-     LOCAL FILE AS OF 2026-09-30, and the error handler went with the hotlink.
-     This pointed at
+  /* One logo element for the header.
+     LOCAL FILE AS OF 2026-09-30, and the `onError` handler went with the
+     hotlink. This pointed at
      `…supabase.co/storage/v1/object/public/asj-files/assets/logo-removebg-preview.webp`
-     — 66.140 B, 500x500, drawn at 48/64 px, so **7,8x more pixels than any screen
-     could show**, fetched from a third-party CDN on EVERY page. `Footer.astro` had
-     already made exactly this swap, and recorded the reasoning: `/icons/logo-asj.webp`
-     is the same emblem WITH an alpha channel, so it drops onto the header gradient
-     with no white box, and it is already committed and already published — no new
-     asset, no new §11.2 decision. Verified by rendering both side by side before the
-     swap, not assumed from the name.
-     `onError` was there so a failed CDN fetch would not show a broken icon; a file
-     that ships with the build cannot fail that way, and silently hiding the brand
-     mark is the wrong behaviour for it. Removing it also drops one `any`. */
+     — 66.140 B, 500x500, drawn at 48/64 px, so **7,8x more pixels than any
+     screen could show**, fetched from a third-party CDN on EVERY page.
+     `/icons/logo-asj.webp` is the same emblem WITH an alpha channel, so it
+     drops onto the header gradient with no white box, and it is already
+     committed and already published — no new asset, no new §11.2 decision.
+     `onError` existed so a failed CDN fetch would not show a broken icon; a
+     file that ships with the build cannot fail that way, and silently hiding
+     the brand mark is the wrong behaviour for it. */
   const brandLogo = (
-    <img id="logo-asj" src="/icons/logo-asj.webp" alt="Logo ASJ" class="w-12 h-12 md:w-16 md:h-16 shrink-0 object-contain drop-shadow-2xl" />
+    <img
+      id="logo-asj"
+      src="/icons/logo-asj.webp"
+      alt="Logo ASJ"
+      width={500}
+      height={500}
+      class="w-12 h-12 md:w-16 md:h-16 shrink-0 object-contain drop-shadow-2xl"
+    />
   );
 
   return (
     <ErrorBoundary>
-      {/* HERO ANCHORS (S1 `#atas`). The hero had no id and no accessible name,
-          which made "kembali ke atas" impossible to express as a link and left
-          the landing page's topmost band as its only unnamed landmark — L3 gave
-          every other section a name.
+      {/* HERO (`#atas`). The hero had no id and no accessible name, which made
+          "kembali ke atas" impossible to express as a link and left the landing
+          page's topmost band as its only unnamed landmark.
 
           `id="atas"` is on the <header> itself, so the anchor IS the band you
-          see; no extra element and no extra nesting. It only materialises when
-          `hero` is set, which is true on this landing route and false on the
-          other four that mount App without it — there the header is chrome, not
-          a page section, and an `#atas` anchor would be meaningless.
+          see; no extra element and no extra nesting.
 
           `scroll-mt-24` is load-bearing, not cosmetic: the site nav is fixed, so
           without it an in-page jump parks the hero's eyebrow under the nav bar.
 
-          The page's single h1 lives inside this hero, and
-          `e2e/test-headings.mjs` enforces exactly one h1 per route, so a second
-          heading here would break it.
+          The page's single h1 lives inside this hero. */}
+      <header
+        id="atas"
+        class="hero-band scroll-mt-24 hero-gradient relative text-white flex items-end p-6 md:p-10"
+      >
+        {/* Hero illustration. It sits UNDER the content because the band's
+            children are not positioned, so a plain absolutely-positioned sibling
+            paints first and the flex row of text lands on top.
 
-          REMOVED (2026-09-19): this element used to carry
-          `aria-label="Atas halaman"` when it was the hero. Biome reports
-          `aria-label` as unsupported on a plain `<header>` (src/components/App.tsx:242,
-          a lint ERROR, and it was one of two diagnostics this change added), and
-          the label was never load-bearing: `e2e/test-landing.mjs:530` decides a
-          section has an accessible name by looking for a HEADING inside it
-          (`hasHeading`, any of h1..h6), which the hero already has. Naming the
-          landmark is the job of that heading, not of an aria-label here. */}
-      {/* ─── THE TWO HEADER VARIANTS ARE NOW TWO SEPARATE CLASS STRINGS ───
-          Owner request 2026-09-27: the landing hero becomes a full-bleed,
-          one-screen band (the reference is a short with a full-screen
-          illustrated scene, an oversized serif headline and a scroll-driven
-          parallax). Splitting the string is a FIX, not a tidy-up: it used to
-          be one common string with a swapped tail, so the hero's geometry
-          could only be reached by editing text that five other routes also
-          render. Those routes (`/loker`, `/public`, `/admin`, `/candidate`,
-          `/share`) mount this header WITHOUT `hero` and must keep the
-          `max-w-7xl … rounded-band min-h-[14rem] md:h-56` chrome box exactly
-          as it is — including the title-clipping fix recorded in the
-          non-hero branch below (the `max-w-[210px]` cap removal, 672d2f1).
-          Two strings means a change to one cannot leak into the other.
-
-          HERO (`/` only) — full-bleed, one screen tall:
-            · no `max-w-7xl` / `mx-auto` / `px-4` / `mt-6` → edge to edge
-            · no `rounded-band` / `border` / `shadow-2xl`  → no card edges
-            · NO `overflow-hidden` — `.hero-band` (global.css) supplies
-              `overflow: clip` instead. This is load-bearing, not cosmetic:
-              `hidden` establishes a SCROLL CONTAINER, and
-              `animation-timeline: view()` resolves against the subject's
-              nearest scroll container, so the parallax planes in motion.css
-              §9e would freeze at a single offset while the stylesheet looked
-              completely correct. `clip` clips the same pixels and creates no
-              scroll container. It is also what stops the oversized planes
-              from painting over the next section.
-            · `.hero-band` supplies `min-height: 100svh` — `svh` and not
-              `vh`, because on a phone `vh` is measured against the LARGEST
-              viewport and the band would be taller than the screen, parking
-              the CTA under the address bar. */}
-      {showHeader && <header id={hero ? "atas" : "asj-header"} class={hero ? "hero-band scroll-mt-24 hero-gradient relative text-white flex items-end p-6 md:p-10" : "hero-gradient max-w-7xl mx-auto px-4 mt-6 relative text-white border border-white/10 shadow-2xl flex items-end rounded-band overflow-hidden transition-colors duration-200 h-auto min-h-[14rem] md:h-56 p-6 md:p-8"}>
-        {/* The overlay that darkens the hero artwork for the copy's contrast
-             sits BELOW the illustration, on purpose: it must paint over the
-             artwork, not under it. See the `header-overlay` div after the
-             <picture>. The `::after` pseudo-element on `.hero-gradient` is a
-             separate layer — the subtle glow. */}
-        {/* Hero illustration (only on the `hero` variant — /share and every
-            other route that mounts the header without a hero keeps the bare
-            gradient). It sits UNDER the content because the band's existing
-            children are not positioned, so a plain absolutely-positioned
-            sibling paints first and the flex row of text lands on top.
-
-            `aria-hidden` + `alt=""` is deliberate and is NOT the same choice as
-            the program tiles: the hero already states its meaning in the h1
-            ("Karier ke Jepang, dimulai dari sini."), so the scene restates it.
-            Announcing it again would make a screen reader read the same idea
-            twice.
+            `aria-hidden` + `alt=""` is deliberate: the hero already states its
+            meaning in the h1, so the scene restates it. Announcing it again
+            would make a screen reader read the same idea twice.
 
             The gradient is kept as the fallback and the image fades over it via
             opacity, rather than replacing it: the band's gradient and the
             artwork share the same dusk palette, so the two blend into one
-            surface instead of meeting at a hard edge. It is `object-cover` so
-            the art fills a band whose height varies from 26rem (mobile) to
-            32rem (desktop) without distorting.
-
-            THE ART WAS REPLACED BY THE OWNER, 2026-09-24. The old asset was a
-            flat-vector scene; the new one is a generated 2.75:1 banner (sakura,
-            Fuji, a pagoda, a figure in an ASJ PORTAL jacket) supplied by the
-            owner from `F:\asset`. Two consequences recorded here because they
-            are not visible from the markup:
-
-              · `width`/`height` moved 1600x900 -> 1600x582, the real size of the
-                1x file. They no longer describe a 16:9 art. (They reserve no
-                layout box either way — this <picture> is `absolute inset-0
-                w-full h-full` — but a wrong intrinsic size is still a false
-                statement about the asset.)
-              · `@2x` is the source's NATIVE ceiling (2079x756), not a true 2x.
-                The band is 1248 CSS px wide and `object-cover` scales by height,
-                so 2x DPR wants ~2818px and the source cannot supply it. It is
-                left un-upscaled on purpose: inventing pixels and calling them
-                resolution is worse than shipping fewer real ones.
+            surface instead of meeting at a hard edge. `object-cover` lets the
+            art fill a band whose height varies without distorting.
 
             `loading="eager"` because this is the LCP element's backdrop; lazy
             here would delay the largest paint on the page the visitor sees
             first. */}
-        {hero && (
-          <picture class="hero-art hero-layer -z-0 pointer-events-none">
-            <source
-              type="image/avif"
-              srcset="/assets/ilustrasi/hero-sakura.avif 1x, /assets/ilustrasi/hero-sakura@2x.avif 2x"
-            />
-            <source
-              type="image/webp"
-              srcset="/assets/ilustrasi/hero-sakura.webp 1x, /assets/ilustrasi/hero-sakura@2x.webp 2x"
-            />
-            <img
-              src="/assets/ilustrasi/hero-sakura.webp"
-              alt=""
-              aria-hidden="true"
-              width={1600}
-              height={582}
-              loading="eager"
-              decoding="async"
-              class="w-full h-full object-cover opacity-60"
-            />
-          </picture>
-        )}
-
-        {/* ─── The NEAR parallax plane (motion.css §9e) ──────────────────
-             A second copy of the band's own `--hero-glow` token, re-positioned
-             and enlarged, drifting further than the artwork above it.
-
-             The depth cue is the DIFFERENCE IN RATE (it travels ~2.75x as far,
-             so it reads as closer to the camera). It also travels the opposite
-             way, and that part is an aesthetic choice rather than a principle —
-             two planes moving the same way at different speeds is the textbook
-             parallax. See the full note in motion.css §9e; it is stated there
-             because the earlier version of both comments dressed the direction
-             up as a law of perception, which it is not.
-
-             WHY IT IS IN THE UPPER-RIGHT (`background-position: 80% 30%`, set
-             in CSS). The hero copy sits at the bottom-left and the
-             `.header-overlay` scrim exists to hold its contrast. A pink bloom
-             behind a white headline raises the backdrop's luminance and eats
-             exactly that contrast — and because this plane drifts, it would
-             carry that bloom in and out of the copy's row across the scroll
-             range. Keeping it up and right keeps the contrast independent of
-             scroll position.
-
-             It is placed AFTER the <picture> so it paints over the artwork and
-             BEFORE `.header-overlay` so the scrim still wins — all three are
-             positioned with no z-index (or `z-0`), so tree order is the paint
-             order. Pure gradient: no image, no filter, no `backdrop-filter`,
-             so a scroll-linked transform on it stays on the compositor.
-
-             `pointer-events-none` for the same reason the artwork and the
-             overlay carry it: it covers the whole band and must never
-             intercept a click meant for the CTA. */}
-        {hero && <div class="hero-haze hero-layer pointer-events-none" aria-hidden="true" />}
-
-        {/* Non-hero header artwork — RESTORED 2026-09-25 (owner item 3).
-             Every route except `/` mounts the header without the hero, and this
-             band was left with a bare gradient. It now carries the theme-driven
-             banner from the legacy `asj-files` path; `bannerSrc` flips with
-             `bannerStore` (SAKURA ⇄ TOKYO), which is what a theme change should
-             visibly do.
-
-             Same geometry contract as the hero picture: `absolute inset-0 -z-0`
-             so it paints UNDER the (unpositioned) flex children, `object-cover`
-             so the band's varying height never distorts the art, and
-             `opacity-60` so the band's gradient still reads through it — the
-             two share a palette and must not meet at a hard edge. `aria-hidden`
-             + `alt=""` because it is decorative: the header's own text carries
-             the meaning, exactly as the hero-branch comment explains.
-
-             No `srcset`/`width`/`height`: the legacy asset is a single remote
-             file with no @2x sibling, and asserting an intrinsic box we do not
-             know would be a false statement about it (same reasoning the hero
-             comment records for its own size change). `loading="lazy"` — unlike
-             the hero, this band is not the LCP element on these routes. */}
-        {!hero && (
+        <picture class="hero-art hero-layer -z-0 pointer-events-none">
+          <source
+            type="image/avif"
+            srcset="/assets/ilustrasi/hero-sakura.avif 1x, /assets/ilustrasi/hero-sakura@2x.avif 2x"
+          />
+          <source
+            type="image/webp"
+            srcset="/assets/ilustrasi/hero-sakura.webp 1x, /assets/ilustrasi/hero-sakura@2x.webp 2x"
+          />
           <img
-            ref={bannerImgRef}
-            src={bannerSrc}
+            src="/assets/ilustrasi/hero-sakura.webp"
             alt=""
             aria-hidden="true"
-            loading="lazy"
+            width={1600}
+            height={582}
+            loading="eager"
             decoding="async"
-            class="absolute inset-0 -z-0 pointer-events-none w-full h-full object-cover opacity-60"
+            class="w-full h-full object-cover opacity-60"
           />
-        )}
+        </picture>
+
+        {/* The NEAR parallax plane (motion.css §9e) — a second copy of the
+            band's own `--hero-glow` token, re-positioned and enlarged, drifting
+            further than the artwork above it. The depth cue is the DIFFERENCE IN
+            RATE, not the direction.
+
+            WHY IT IS IN THE UPPER-RIGHT (`background-position: 80% 30%`, set in
+            CSS). The hero copy sits at the bottom-left and the `.header-overlay`
+            scrim exists to hold its contrast. A pink bloom behind a white
+            headline raises the backdrop's luminance and eats exactly that
+            contrast — and because this plane drifts, it would carry that bloom
+            in and out of the copy's row across the scroll range.
+
+            `pointer-events-none` for the same reason the artwork and the
+            overlay carry it: it covers the whole band and must never intercept
+            a click meant for the CTA. */}
+        <div class="hero-haze hero-layer pointer-events-none" aria-hidden="true" />
 
         {/* The artwork overlay — DESIGN.md §3.6's level-2 "overlay gradien".
-             It is a DIRECTIONAL gradient, not a scrim: transparent over the far
-             side of the band, dark only where the copy sits (bottom on a phone,
-             left at `lg`). `.header-overlay` in global.css is re-aimed to the
-             text's side and darkens in BOTH themes, because the hero copy stays
-             white in both (global.css §5d).
+            It is a DIRECTIONAL gradient, not a scrim: transparent over the far
+            side of the band, dark only where the copy sits (bottom on a phone,
+            left at `lg`). `.header-overlay` in global.css is re-aimed to the
+            text's side and darkens in BOTH themes, because the hero copy stays
+            white in both.
 
-             RESTORED 2026-09-24. The div that carried this class was removed in
-             84c7ed6 with the note that "the CSS gradient in `.hero-gradient`
-             already has the right contrast" — true of the bare gradient, but the
-             hero has since gained the `hero-sakura` illustration at
-             `opacity-60`, and it is the ARTWORK that sits behind the headline
-             now. With the class orphaned (0 elements), the headline measured a
-             worst glyph-background of 2.36-2.88:1 in light mode, under the 3:1
-             floor. It is decorative, so `aria-hidden` + `pointer-events-none`.
-
-             ⚠ NOW APPLIED TO BOTH VARIANTS, 2026-09-25. It used to be
-             `{hero && …}` because only the hero carried artwork. The non-hero
-             header now carries the theme banner too (item 3), so the overlay is
-             no longer conditioned on `hero` — gating it on the hero would leave
-             the non-hero header's white copy sitting directly on the artwork.
-             MEASURED on `/public` 1280, glyph row sampled with the header text
-             hidden so only the backdrop is read: dark 9.64:1; light varies with
-             the banner artwork as it paints — 12.8:1 over the bare gradient down
-             to **3.35:1** once a bright `sakra_banner.webp` petal lands behind
-             the copy. All clear the 3:1 floor, the light one by design margin.
-             NOTE the light figure depends on global.css §5d's band SELF-match
-             rule as well as this overlay: without it the non-hero h1 inherited
-             §5b's `#1f1d1c` and measured **1.21:1** against this same backdrop
-             (it was ALREADY 1.10:1 at HEAD, before the banner — a pre-existing
-             defect this task surfaced and fixes). See the §5d comment. */}
+            It is required by the artwork, not by the bare gradient: with the
+            class orphaned (0 elements), the headline measured a worst
+            glyph-background of 2.36-2.88:1 in light mode, under the 3:1 floor.
+            It is decorative, so `aria-hidden` + `pointer-events-none`. */}
         <div class="absolute inset-0 header-overlay pointer-events-none" aria-hidden="true" />
 
-        {/* Hamburger — shown on BOTH mobile and desktop. One menu surface
-            for both viewports (the user picks the drawer icon, the same
-            drawer slides in). Desktop keeps just the language toggle
-            inline so flipping id⇄jp stays one tap. */}
-        {/* ─── The two header controls are sized to the project's own touch floor.
-             MEASURED 2026-09-22, at a 390px viewport, before this change:
-             the hamburger rendered 40x40 and the language toggle 36x36, while
+        {/* ─── The header controls, sized to the project's own touch floor.
+             MEASURED 2026-09-22, at a 390px viewport, before this change: the
+             hamburger rendered 40x40 and the language toggle 36x36, while
              DESIGN.md:582 ("Tinggi minimum | 44 px") and DESIGN.md:691
              ("Target sentuh | >=44 px, idealnya 48 px") both require 44. The rule
-             was already gate-enforced, but only for the shared Button.astro --
-             `scripts/ci/button.mutations.mjs` M4 breaks
-             `min-h-[44px]` there and asserts the failure. Hand-rolled buttons
-             like these two were outside that gate's reach, which is exactly how
-             they drifted under the floor without anything going red.
+             was already gate-enforced, but only for the shared Button.astro —
+             hand-rolled buttons like these two were outside that gate's reach,
+             which is exactly how they drifted under the floor unnoticed.
 
-             Sizes are now literal 11 (44px) rather than a min-h, because these
-             are fixed icon buttons inside a rounded-full pill: a min-height
-             would let the circle stay 40px tall while only the tap box grew,
-             which reads as a misaligned control. `gap-2` is unchanged, so the
-             two still sit on the same baseline. */}
+             Sizes are literal 11 (44px) rather than a min-h, because these are
+             fixed icon buttons inside a rounded-full pill: a min-height would
+             let the circle stay 40px tall while only the tap box grew, which
+             reads as a misaligned control. `gap-2` keeps them on one baseline. */}
         <div class="absolute top-4 right-4 z-30 flex items-center gap-2">
-          <button ref={hamburgerRef} onClick={toggleMenu} class="w-11 h-11 flex items-center justify-center bg-black/70 hover:bg-zinc-800 text-white rounded-full border border-white/60 transition shadow-lg hamburger-btn" aria-label="Toggle Menu" aria-expanded={menuOpen}>
-            <Icon name={menuOpen ? "times" : "bars"} class="text-lg" />
+          <button
+            type="button"
+            onClick={toggleLang}
+            aria-label="Toggle language"
+            class="w-11 h-11 flex items-center justify-center bg-black/70 hover:bg-zinc-800 text-white rounded-full border border-white/60 transition shadow-lg"
+          >
+            <Icon name="language" class="text-lg" />
+          </button>
+          <button
+            ref={hamburgerRef}
+            type="button"
+            onClick={toggleMenu}
+            class="w-11 h-11 flex items-center justify-center bg-black/70 hover:bg-zinc-800 text-white rounded-full border border-white/60 transition shadow-lg hamburger-btn"
+            aria-label="Toggle Menu"
+            aria-expanded={menuOpen}
+          >
+            <Icon name={menuOpen ? 'times' : 'bars'} class="text-lg" />
           </button>
         </div>
 
-        {hero ? (
-          /* ─── Hero variant (landing page `/`) ────────────────────────────
-             WHY THE HERO LIVES IN App.tsx AND NOT IN ITS OWN .astro FILE.
-             The band's background is the theme artwork, and that value lives in
-             `bannerStore` — browser-only state that App already resolves and
-             already listens to (`asj-theme-change`). A separate Astro hero would
-             need its own copy of the theme→artwork map, which would be the THIRD
-             copy (App.tsx and Footer.astro already each carry one). Duplicating
-             it a third time to satisfy a file layout is the wrong trade: the
-             footer's copy is already justified in its own comment only because
-             it is an island-free script.
-
-             WHY THE COMPANY NAME IS A `div` HERE. `e2e/test-headings.mjs`
-             enforces exactly one h1 per route, and it is right to: an h1 that
-             reads "PT AMANAH SAKURA JAPAN" does not say what the page is
-             (WCAG 2.4.2). On this route the headline below is the h1, so the
-             company name steps down. On every other route the header keeps the
-             h1, because for those it IS the only one. */
-          <div class="relative z-10 w-full grid gap-6 lg:grid-cols-12 lg:items-end">
-            <div class="lg:col-span-7 min-w-0">
-              <div class="flex items-center gap-3 min-w-0">
-                {brandLogo}
-                <span class="text-pink-300 text-eyebrow font-bold uppercase truncate" data-lang="profile.hero_eyebrow">{t("profile.hero_eyebrow")}</span>
-              </div>
-              <p class="text-pink-300 text-eyebrow font-bold uppercase mt-5" data-lang="profile.hero_tagline">{t("profile.hero_tagline")}</p>
-              {/* `text-white` IS EXPLICIT HERE, and that is load-bearing — do not
-                  delete it because "the hero is dark anyway".
-
-                  This h1 carried no colour class until 2026-09-20 and inherited
-                  `--color-fg` from the theme. That worked only while light mode's
-                  `--color-fg` happened to be `#f1f5f9` (near-white), which is the
-                  right colour for the hero POLARITY but came from the wrong place:
-                  it is the PAGE text token, and the light palette has since been
-                  retuned to `#16121c` so body copy reads on the white canvas.
-
-                  Measured consequence of the retune, in a browser against a real
-                  server — the hero h1 resolved to `rgb(31, 29, 28)` on a
-                  `linear-gradient(135deg, rgb(42,18,53) …)` band: contrast
-                  **1.01:1**, i.e. effectively invisible. The h1 of the landing page.
-
-                  The band is deliberately dark in BOTH themes (see the note on
-                  --hero-gradient in theme.css), so the heading's colour must not be
-                  derived from the theme at all. Its siblings already name theirs —
-                  `text-pink-300` on the eyebrow, `text-slate-200` on the sub — which
-                  is exactly why only the one colourless element broke. */}
-              {/* ─── The DISPLAY headline — serif, and the ONLY user of the
-                     display face (theme.css `--font-display`) ───
-                  Owner request 2026-09-27, from a reference short: a
-                  full-screen hero with an oversized SERIF display headline.
-                  `font-display` swaps Inter for Instrument Serif (20.5 KB,
-                  latin, one weight — see BaseLayout.astro and theme.css).
-
-                  `font-normal` IS NOT OPTIONAL. The family ships weight 400
-                  ONLY, so leaving the old `font-black` would ask the browser
-                  to SYNTHESISE a 900 — a smeared fake on a high-contrast
-                  serif, which is the worst possible face to fake bold on.
-                  The hierarchy this loses is bought back by SIZE: the
-                  display tier was retuned to a 72 px ceiling (theme.css
-                  `--text-display`).
-
-                  `leading-tight` was REMOVED at the same time. It (1.25) was
-                  overriding the `text-display` token's own leading, so the
-                  token's line-height was dead on this element; a display
-                  serif wants the tighter 1.02 the token now carries, and
-                  having one owner for the leading is the point of the token.
-
-                  The `text-white` note below still applies unchanged — the
-                  band is dark in BOTH themes, so the colour must not come
-                  from the theme. */}
-              <h1 class="text-display font-display font-normal text-white drop-shadow-lg mt-2">{t("profile.hero_title")}</h1>
-              <p class="text-body text-slate-200 mt-4 max-w-[52ch] leading-relaxed">{t("profile.hero_sub")}</p>
-              {/* NO "Lihat Lowongan" CTA HERE. Owner ruling 2026-09-24: `/` is a
-                  company profile for MoU/business partners, not a job board, so
-                  the hero's primary CTA to /loker is removed and the section nav
-                  is the page's ONLY path to the vacancy list. The register
-                  button below stays — it is not a /loker link. */}
-              <div class="flex flex-wrap gap-3 mt-8">
-                <button type="button" onClick={openRegister} class="inline-flex items-center px-7 py-3.5 rounded-pill bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-sm backdrop-blur-sm transition"><Icon name="user-plus" class="mr-2" />{t("profile.hero_cta_secondary")}</button>
-              </div>
-              <div class="flex flex-wrap gap-2 mt-6">
-                {[t("profile.hero_chip_ssw"), t("profile.hero_chip_magang"), t("profile.hero_chip_penempatan")].map((label) => (
-                  <span key={label} class="px-3.5 py-1.5 rounded-pill bg-white/10 border border-white/15 text-caption font-bold text-slate-200 backdrop-blur-sm">{label}</span>
-                ))}
-              </div>
+        <div class="relative z-10 w-full grid gap-6 lg:grid-cols-12 lg:items-end">
+          <div class="lg:col-span-7 min-w-0">
+            <div class="flex items-center gap-3 min-w-0">
+              {brandLogo}
+              <span class="text-pink-300 text-eyebrow font-bold uppercase truncate" data-lang="profile.hero_eyebrow">
+                {t('profile.hero_eyebrow')}
+              </span>
             </div>
-            {/* Glass tiles: the ONLY place besides the closing band that uses a
-                translucent surface, and the only one over artwork. Kept to one
-                area per screen — `backdrop-filter` costs per frame.
+            <p class="text-pink-300 text-eyebrow font-bold uppercase mt-5" data-lang="profile.hero_tagline">
+              {t('profile.hero_tagline')}
+            </p>
 
-                COLUMN COUNT — measured, not guessed. This used to read
-                `grid gap-3 sm:grid-cols-3 lg:grid-cols-1`, so the lg tier
-                overrode the row and the three tiles STACKED on desktop, which is
-                the opposite of the intent: one strip became a 479px-wide column
-                three deep. Measured with e2e/measure-hero-stats.mjs before the
-                fix — 700px ONE ROW (209px x3), 1280px STACKED (479px x1,
-                y=235/325/416). The hero grid on the right is `lg:col-span-5`
-                (5 of 12 columns), so three tiles across it are ~152px each:
-                enough for a 4-digit number over a two-word caption at the
-                `text-caption` size, and it is what makes the strip read as a
-                summary rather than a list.
+            {/* `text-white` IS EXPLICIT HERE, and that is load-bearing — do not
+                delete it because "the hero is dark anyway".
 
-                WHY `sm:grid-cols-3` AND NOT `grid-cols-3`. Forcing three columns
-                at every width fixed the desktop stack and BROKE mobile: at 390px
-                the tiles became 106px wide and 106px tall (from 73px), and
-                "Bidang penempatan" wrapped mid-word to "penempata/n" — measured
-                after the first attempt, visible in test-results/landing/390-s01.png.
-                Below `sm` the tiles now sit one per row at full width, which is
-                the reading order a phone actually wants; the strip shape starts
-                at 640px, where there is room for it. */}
-            <div class="lg:col-span-5 grid gap-3 sm:grid-cols-3">
-              {HERO_STATS.map((stat) => (
-                <div key={stat.labelKey} class="rounded-card bg-white/10 border border-white/15 backdrop-blur-sm px-5 py-4 flex sm:block items-center justify-between gap-3 hover:bg-white/15 transition-colors">
-                  <div class="text-section font-black text-pink-300 leading-none">{stat.value}</div>
-                  <div class="text-caption text-slate-200 mt-0 sm:mt-2">{t(stat.labelKey)}</div>
-                </div>
+                This h1 carried no colour class until 2026-09-20 and inherited
+                `--color-fg` from the theme. That worked only while light mode's
+                `--color-fg` happened to be near-white, which came from the wrong
+                place: it is the PAGE text token, and the light palette was later
+                retuned to `#16121c` so body copy reads on the white canvas.
+
+                Measured consequence, in a browser against a real server: the
+                hero h1 resolved to `rgb(31, 29, 28)` on a
+                `linear-gradient(135deg, rgb(42,18,53) …)` band — contrast
+                **1.01:1**, i.e. effectively invisible. The h1 of the landing
+                page. The band is deliberately dark in BOTH themes, so the
+                heading's colour must not be derived from the theme at all. */}
+            <h1 class="text-display font-display font-normal text-white drop-shadow-lg mt-2">
+              {t('profile.hero_title')}
+            </h1>
+            <p class="text-body text-slate-200 mt-4 max-w-[52ch] leading-relaxed">
+              {t('profile.hero_sub')}
+            </p>
+
+            {/* The hero's CTA. It used to be `openRegister`, which opened the
+                registration modal — a modal that posted to a Netlify Function
+                this repo does not have. It now points at the contact section,
+                which is the page's own conversion surface and actually works:
+                `#kontak` carries the phone number, the three channel QR codes
+                and the form. Pointing at WhatsApp directly was the alternative
+                and was not taken, because it would presume a channel the section
+                itself already offers alongside the others. */}
+            <div class="flex flex-wrap gap-3 mt-8">
+              <a
+                href="#kontak"
+                class="inline-flex items-center px-7 py-3.5 rounded-pill bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-sm backdrop-blur-sm transition"
+              >
+                <Icon name="user-plus" class="mr-2" />
+                {t('profile.hero_cta_secondary')}
+              </a>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-6">
+              {[t('profile.hero_chip_ssw'), t('profile.hero_chip_magang'), t('profile.hero_chip_penempatan')].map((label) => (
+                <span key={label} class="px-3.5 py-1.5 rounded-pill bg-white/10 border border-white/15 text-caption font-bold text-slate-200 backdrop-blur-sm">
+                  {label}
+                </span>
               ))}
             </div>
           </div>
-        ) : (
-          <div class="relative z-10 w-full flex flex-col md:flex-row justify-between items-start md:items-end gap-5">
-            <div class="flex items-center gap-3 md:gap-5 min-w-0 w-full md:w-auto">
-              {brandLogo}
-              {/* The title takes whatever width the row gives it. There is NO
-                  width cap, and that is a measured decision, not an omission.
 
-                  ⚠ `w-full` ON THE GROUP IS LOAD-BEARING. The row is
-                  `items-start`, so a flex child does NOT stretch — without
-                  `w-full` the group sizes to its CONTENT, which is wider than
-                  the row at small widths, so the box grows past the container
-                  and `truncate` never engages. Measured 2026-09-27: without
-                  `w-full` the h1 box ran to x=351 on a 320px viewport.
+          {/* Glass tiles: the ONLY place besides the closing band that uses a
+              translucent surface, and the only one over artwork. Kept to one
+              area per screen — `backdrop-filter` costs per frame.
 
-                  REPLACES `max-w-[210px]`, WHICH PROTECTED NOTHING. That cap
-                  was added because the title box (x ends 287) and the menu
-                  button (x starts 244) overlap HORIZONTALLY at 320px. But they
-                  do not overlap VERTICALLY, and never did: the button is
-                  `absolute top-4` (y 41..85) while the title sits at the bottom
-                  of the header via the header's own `items-end` (y 195..223 at
-                  320px; 138..218 on /admin). Measured across 3 routes x 6
-                  widths (320/360/390/414/768/1280) — **18 of 18 have zero
-                  vertical overlap**, so no text ever rendered under the button.
+              COLUMN COUNT — measured, not guessed. This used to read
+              `grid gap-3 sm:grid-cols-3 lg:grid-cols-1`, so the lg tier
+              overrode the row and the three tiles STACKED on desktop, which is
+              the opposite of the intent: one strip became a 479px-wide column
+              three deep. Measured with e2e/measure-hero-stats.mjs before the
+              fix — 700px ONE ROW (209px x3), 1280px STACKED (479px x1,
+              y=235/325/416).
 
-                  The old comment claimed "51px renders *under* the button",
-                  which is an x-only comparison. Do not re-add a cap on that
-                  reasoning; compare the two RECTANGLES, not their x-ranges.
-
-                  Measured effect of removing it (`h1 clientWidth/scrollWidth`,
-                  and the full name is 274px):
-                    320px  210 -> 211   360px  210 -> 251
-                    390px  210 -> 281 (FULL)   414px  210 -> 305 (FULL)
-                    /admin 320 -> 271 (FULL), 768 -> 671 (FULL)
-                  So the company name is now complete from 390px up instead of
-                  permanently ellipsised. No horizontal overflow at any width.
-
-                  `truncate` STAYS and `App.header.test.tsx` still enforces it
-                  ("memotong judul dengan elipsis, bukan melipatnya"); wrapping
-                  was tried as `line-clamp-2` on 2026-09-25 and reverted. */}
-              <div class="min-w-0 flex-1">
-                <div id="header-tagline" class="text-pink-300 text-xs md:text-sm font-bold tracking-[4px] mb-1 truncate">{t("header.tagline")}</div>
-                {/* This is the page's ONLY h1 on /public, /admin, /candidate,
-                    /share — every route that mounts the header without a hero.
-                    Demoting it globally would leave those routes with no h1 at
-                    all, which is why the hero variant above is opt-in.
-
-                    ⚠ `truncate` STAYS, AND `App.header.test.tsx` ENFORCES IT
-                    ("memotong judul dengan elipsis, bukan melipatnya"). This was
-                    TRIED as `line-clamp-2` on 2026-09-25 to stop the company name
-                    rendering as "PT AMANAH SAKUR…" on a phone, and the test caught
-                    it. Measured before reverting, at /loker:
-                      · 390px  line-clamp-2 -> title ends x=281, button starts 314, clears by 27px
-                      · 360px  line-clamp-2 -> title ends x=281, button starts 284, OVERLAPS
-                      · 320px  line-clamp-2 -> title ends x=281, button starts 244, OVERLAPS by 43px
-                      · `truncate` at the same widths -> the BOX is the same 210px, so
-                        it overlaps at 360/320 too. Wrapping bought nothing there.
-                    So the ellipsis is not what protects the button — the
-                    `max-w-[210px]` cap is, and that cap is simply too wide below
-                    ~370px. Making the cap responsive is a real change with its own
-                    risk, so it is REPORTED rather than smuggled in under a UX
-                    sweep. Do not swap this class without re-running the measured
-                    comparison above. */}
-                <h1 class="text-lg md:text-3xl font-black italic tracking-wide drop-shadow-lg truncate"><span data-lang="header.company_name">{t("header.company_name")}</span></h1>
+              WHY `sm:grid-cols-3` AND NOT `grid-cols-3`. Forcing three columns
+              at every width fixed the desktop stack and BROKE mobile: at 390px
+              the tiles became 106px wide and 106px tall (from 73px), and
+              "Bidang penempatan" wrapped mid-word to "penempata/n". Below `sm`
+              the tiles now sit one per row at full width, which is the reading
+              order a phone actually wants. */}
+          <div class="lg:col-span-5 grid gap-3 sm:grid-cols-3">
+            {HERO_STATS.map((stat) => (
+              <div
+                key={stat.labelKey}
+                class="rounded-card bg-white/10 border border-white/15 backdrop-blur-sm px-5 py-4 flex sm:block items-center justify-between gap-3 hover:bg-white/15 transition-colors"
+              >
+                <div class="text-section font-black text-pink-300 leading-none">{stat.value}</div>
+                <div class="text-caption text-slate-200 mt-0 sm:mt-2">{t(stat.labelKey)}</div>
               </div>
-            </div>
+            ))}
           </div>
-        )}
-      </header>}
+        </div>
+      </header>
 
       {/* Scrim only, and deliberately presentational. It is a pointer-only
           convenience: the drawer carries its own labelled close button and the
-          hamburger above toggles, so nothing is lost by keeping it out of the
-          a11y tree. Left as a bare clickable div it measured as a nameless
+          hamburger toggles, so nothing is lost by keeping it out of the a11y
+          tree. Left as a bare clickable div it measured as a nameless
           `u-modal-shell` overlay — indistinguishable, to a screen reader, from
-          the real modals beside it (§25).
+          a real modal.
 
           `.js-scrim` IS LOAD-BEARING — do not remove it. The light-theme shim
           in global.css remaps `bg-black/NN` to a pale surface for cards, and it
@@ -735,110 +407,82 @@ export default function App(
           from `.u-viewport-fixed`, NOT `inset-0`, so it slipped the exemption
           and was repainted OPAQUE. MEASURED light-theme, drawer open: computed
           background was `rgb(239,233,239)` (opacity 1) hiding the whole page;
-          dark theme was correct at `oklab(0 0 0 / 0.7)`. `.js-scrim` is the
-          explicit, named opt-out for exactly this case. */}
-      {menuOpen && <div aria-hidden="true" class="u-viewport-fixed u-modal-shell bg-black/70 js-scrim z-scrim" onClick={() => setMenuOpen(false)}></div>}
-      
-      {/* ─── Drawer (mobile + desktop) ───
-          Same drawer on both breakpoints so the user gets one predictable
-          menu. Width is 18rem on phones (full coverage) and 24rem on
-          desktop (roomier labels, scrollable).
+          dark theme was correct. `.js-scrim` is the explicit, named opt-out for
+          exactly this case. */}
+      {menuOpen && (
+        <div
+          aria-hidden="true"
+          class="u-viewport-fixed u-modal-shell bg-black/70 js-scrim z-scrim"
+          onClick={closeMenu}
+        />
+      )}
 
+      {/* ─── Drawer ───
           `u-viewport-fixed--right` rather than `fixed top-0 right-0 h-full`:
           with `scrollbar-gutter: stable` on <html>, a plain `right: 0` on a
-          fixed element is resolved against the initial containing block,
-          which EXCLUDES the reserved gutter — so on desktop the drawer
-          stopped 15px short of the screen edge (measured: innerWidth 1280,
-          nav.right 1265). The utility pins it to the physical viewport.
-          See layout.css §3b for the measurement and why the gutter itself
-          is not removed. */}
-      <nav ref={drawerRef} class={"u-viewport-fixed--right z-drawer w-72 md:w-96 bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col transition-transform duration-300 transform " + (menuOpen ? "translate-x-0" : "translate-x-full")} aria-label="Primary navigation">
+          fixed element is resolved against the initial containing block, which
+          EXCLUDES the reserved gutter — so on desktop the drawer stopped 15px
+          short of the screen edge (measured: innerWidth 1280, nav.right 1265).
+          The utility pins it to the physical viewport. */}
+      <nav
+        ref={drawerRef}
+        class={
+          'u-viewport-fixed--right z-drawer w-72 md:w-96 bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col transition-transform duration-300 transform ' +
+          (menuOpen ? 'translate-x-0' : 'translate-x-full')
+        }
+        aria-label="Primary navigation"
+      >
         <div class="flex items-center justify-between p-4 border-b border-slate-700">
-          <span class="text-xs font-bold text-slate-500 uppercase tracking-widest"><Icon name="bars" class="mr-2 text-sky-400" /> {t("ui.menu")}</span>
-          <button onClick={toggleMenu} class="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-white transition" aria-label="Close"><Icon name="times" class="text-xl" /></button>
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">
+            <Icon name="bars" class="mr-2 text-sky-400" /> {t('ui.menu')}
+          </span>
+          <button
+            type="button"
+            onClick={closeMenu}
+            class="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-white transition"
+            aria-label="Close"
+          >
+            <Icon name="times" class="text-xl" />
+          </button>
         </div>
-        {/* User identity strip — sits above the action list so the drawer
-            answers "who am I?" before the buttons do. Hidden when logged
-            out so the Login/Register block stays the first thing. */}
-        {u.isLoggedIn && (
-          <div class="px-4 py-3 border-b border-slate-700 bg-slate-800/40">
-            <div class="text-[11px] uppercase tracking-widest text-slate-500 mb-1">{u.role === "admin" ? t("header.admin") : t("header.dashboard")}</div>
-            <div class={"text-base font-bold " + (u.role === "admin" ? "text-amber-300" : "text-emerald-300")}>{u.name}</div>
-          </div>
-        )}
+
         <div class="flex-1 u-scroll-area p-4 space-y-3">
           <div class="space-y-3 pb-3 mb-3 border-b border-slate-700">
-            {/* ─── THE SITE'S ONLY PATH TO `/loker` ───
-                Owner ruling 2026-09-25 removed the entire band below the hero
-                (the announcement marquee, the live-vacancy count strip and the
-                `<SiteNav />` section bar). That bar's "Lowongan" item was the
-                ONLY `href="/loker"` anywhere in `src/**` — measured, every other
-                hit is prose and `Footer.astro` links four fragments only. So the
-                link moves here, where the owner said it belongs ("dari menu
-                hamburger").
-
-                WHY IT SITS ABOVE THE AUTH BLOCK AND NOT INSIDE IT. Every other
-                link in this drawer is behind a role check (`u.isLoggedIn &&`), so
-                a logged-out visitor would have had no path to the vacancies at
-                all — the page would look like it has no job list. This is the
-                always-visible block, so it renders for everyone.
-
-                `profile.nav_loker` is deliberately the SAME key the deleted bar
-                used: it is the same link with the same word, and re-keying it
-                would orphan the translations for no gain. It is now the key's
-                only consumer, so it must NOT be cleaned up as a nav orphan. */}
-            <a href="/loker" class="w-full py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white rounded-xl font-bold text-sm transition flex items-center justify-center"><Icon name="briefcase" class="mr-2 text-sky-400" /> {t("profile.nav_loker")}</a>
-            {/* Gradient CTA — `from-emerald-700 to-sky-700`, hover DARKENS
-                (`hover:from-emerald-800 hover:to-sky-800`), NOT the old
-                lightening step (measured 2026-09-27).
-                White on this pair's stops, floor 4.5:1 at text-sm/700 (normal):
-                  emerald-600 3.77  FAIL   emerald-500 2.54  FAIL (worse)
-                  sky-600     4.10  FAIL   sky-500     2.77  FAIL
-                  emerald-700 5.48  PASS   emerald-800 7.68  PASS
-                  sky-700     5.93  PASS   sky-800     7.56  PASS
-                The old `hover:from-emerald-500 hover:to-sky-500` was the WORST
-                state on the page (2.54:1) — lightening a gradient always cuts
-                white-text contrast, so the hover must darken instead. Measured
-                on the built 404 page, which uses the same pair: 3.71:1 before. */}
-            <button onClick={installApp} class="w-full py-3 bg-gradient-to-r from-emerald-700 to-sky-700 hover:from-emerald-800 hover:to-sky-800 text-white rounded-xl font-bold text-sm shadow-lg transition flex items-center justify-center"><Icon name="mobile-alt" class="mr-2" /> {t("ui.install_app")}</button>
-            <button onClick={toggleLang} aria-label="Toggle language" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><Icon name="language" /> {t("ui.language")} <span>{lang === "id" ? "ID" : "JP"}</span></button>
+            <button
+              type="button"
+              onClick={installApp}
+              class="w-full py-3 bg-gradient-to-r from-emerald-700 to-sky-700 hover:from-emerald-800 hover:to-sky-800 text-white rounded-xl font-bold text-sm shadow-lg transition flex items-center justify-center"
+            >
+              <Icon name="mobile-alt" class="mr-2" /> {t('ui.install_app')}
+            </button>
+            <button
+              type="button"
+              onClick={toggleLang}
+              aria-label="Toggle language"
+              class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"
+            >
+              <Icon name="language" /> {t('ui.language')} <span>{lang === 'id' ? 'ID' : 'JP'}</span>
+            </button>
           </div>
-          {hydrated && !u.isLoggedIn && (<div class="space-y-3">
-            {/* ─── `data-nav-login` MOVED HERE FROM THE DELETED SECTION BAR ───
-                The attribute is a TEST HOOK, not styling: `e2e/test-dialog.mjs`
-                uses it to open the login modal twice and prove the modal keeps
-                its `role`/`aria-modal`/focus on the SECOND open. It used to sit
-                on `SiteNav.astro`'s login button; when the owner deleted the
-                whole band below the hero (2026-09-25) that button went with it
-                and the gate died on `waiting for locator('[data-nav-login]')`.
-                The hook moves to the navigation's login affordance — which is
-                this one now — rather than the gate being weakened, so the
-                second-open contract keeps its proof.
 
-                THE GATE MUST OPEN THE DRAWER FIRST: this button is inside
-                `translate-x-full` until the hamburger is clicked, and Playwright
-                refuses to click an element it cannot see. */}
-            <button data-nav-login onClick={openLogin} class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-sm shadow-lg transition">{t("header.login")}</button>
-            <button onClick={openRegister} class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-sm transition">{t("header.register")}</button>
-            <button onClick={openAdminLogin} class="w-full py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm shadow-lg transition"><Icon name="shield-alt" class="mr-2" /> {t("header.admin_login")}</button>
-          </div>)}
-          {u.isLoggedIn && u.role === "admin" && (<div class="space-y-3">
-            <a href="/admin" class="w-full py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm shadow-lg transition flex items-center justify-center"><Icon name="cogs" class="mr-2" /> {t("header.admin")}</a>
-            <button onClick={() => { setShowAiCopilot(true); setMenuOpen(false); }} class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-sm transition flex items-center justify-center"><Icon name="robot" class="mr-2" /> {t("ui.ai_copilot")}</button>
-            <a href="/public" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-sm transition flex items-center justify-center"><Icon name="globe" class="mr-2" /> {t("header.public")}</a>
-            <button onClick={handleLogout} class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-sm transition flex items-center justify-center"><Icon name="sign-out-alt" class="mr-2" /> {t("header.logout")}</button>
-          </div>)}
-          {u.isLoggedIn && u.role === "kandidat" && (<div class="space-y-3">
-            <a href="/candidate" class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-sm shadow-lg transition flex items-center justify-center"><Icon name="id-card" class="mr-2" /> {t("header.dashboard")}</a>
-            <a href="/public" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-sm transition flex items-center justify-center"><Icon name="globe" class="mr-2" /> {t("header.public")}</a>
-            <button onClick={handleLogout} class="w-full py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm transition flex items-center justify-center"><Icon name="sign-out-alt" class="mr-2" /> {t("header.logout")}</button>
-          </div>)}
+          {/* The section list. Every href here is an anchor that exists on `/`
+              — see the note on NAV at the top of this file. The links close the
+              drawer so the jump is visible; without that the drawer stays over
+              the section it just scrolled to. */}
+          <div class="space-y-1">
+            {NAV.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={closeMenu}
+                class="block w-full px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition font-bold text-sm"
+              >
+                {t(item.key)}
+              </a>
+            ))}
+          </div>
         </div>
       </nav>
-
-      {aiCopilotP.present && <AdminAiCopilot onClose={() => setShowAiCopilot(false)} closing={aiCopilotP.closing} />}
-      {cekSiswaP.present && <CekSiswaModal onClose={() => setShowCekSiswa(false)} closing={cekSiswaP.closing} />}
-      {hydrated && <LoginModal mode={modalMode} onClose={closeModal} onSwitchMode={setModalMode} />}
     </ErrorBoundary>
   );
 }

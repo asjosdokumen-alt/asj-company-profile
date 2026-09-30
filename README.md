@@ -1,11 +1,14 @@
 # asj-company-profile
 
-Halaman **profil perusahaan** PT Amanah Sakura Japan — satu rute: `/`.
+Halaman **profil perusahaan** PT Amanah Sakura Japan — lembaga pelatihan dan
+penempatan kerja ke Jepang di Kabupaten Ponorogo, Jawa Timur.
 
-Repo ini adalah **pemisahan dari portal** (`asj-astro`). Portal memuat 11 rute
-(halaman depan, loker, kandidat, admin, pendaftaran, AI CV, master, dsb.) plus
-backend Netlify Functions, indexer kode, dan migrasi database. Repo ini memuat
-**halaman profilnya saja**.
+Situs statis. Satu rute (`/`) plus halaman 404, dua bahasa (Indonesia dan
+Jepang), dan satu-satunya bagian yang butuh server adalah formulir kontak —
+yang ditangani Netlify Forms, bukan backend sendiri.
+
+**Belum di-deploy.** Alamatnya ditentukan nanti; panduan ada di
+[`docs/DEPLOY_NETLIFY.md`](docs/DEPLOY_NETLIFY.md).
 
 ---
 
@@ -13,23 +16,25 @@ backend Netlify Functions, indexer kode, dan migrasi database. Repo ini memuat
 
 ```bash
 npm install
-npm run dev          # http://localhost:4321
-npm run build        # dist/  (static)
-npm run preview
-npm run typecheck    # hijau
-npm run lint         # MERAH — lihat catatan di bawah
-npm run verify:assets   # gate §11.2 — lihat di bawah
+npm run dev            # http://localhost:4321
+npm run build          # → dist/  (statis)
+npm run preview        # menyajikan dist/ apa adanya
+npm run typecheck      # harus hijau
+npm run verify:assets  # gate §11.2 — lihat di bawah
 ```
 
-`npm run build` menjalankan dua hal: `astro build`, lalu
-`node scripts/build-sw-manifest.mjs` yang menulis ulang daftar precache service
-worker dari artefak yang baru saja dibangun. Urutannya penting — manifest yang
-dihitung dari build lama akan mem-precache nama berkas ber-hash yang tidak ada lagi.
+### `npm run build` menjalankan DUA hal, dan urutannya penting
+
+`astro build` dulu, baru `node scripts/build-sw-manifest.mjs`. Skrip kedua
+menulis ulang daftar precache service worker dari artefak yang **baru saja**
+dibangun. Membalik urutannya, atau menjalankan `astro build` saja, akan
+mengirim `sw.js` dengan blok precache kosong — situsnya tetap hidup, tapi tidak
+lagi benar-benar bisa dipakai offline, dan tidak ada yang terlihat salah.
 
 ### Kalau `npm install` gagal di esbuild
 
-Di lingkungan bersandbox ini postinstall `esbuild` tidak bisa men-`spawn`
-binernya (`pid: 0`), dan install berhenti. Obatnya:
+Di lingkungan bersandbox, postinstall `esbuild` tidak bisa men-`spawn` binernya
+(`pid: 0`) dan install berhenti:
 
 ```bash
 npm install --ignore-scripts
@@ -37,168 +42,151 @@ npm install --ignore-scripts
 
 Aman di sini: postinstall esbuild hanya **memverifikasi** binernya, sedangkan
 binernya sendiri datang dari paket platform `@esbuild/win32-x64`, yang tetap
-terpasang. `@tailwindcss/oxide-win32-x64-msvc` juga tidak butuh script.
-Di mesin biasa tanpa sandbox, `npm install` biasa seharusnya cukup.
+terpasang. Di mesin biasa tanpa sandbox, `npm install` biasa seharusnya cukup.
 
-### `npm run lint` merah, dan itu bukan dari pemisahan ini
+### `npm run lint` sengaja belum dijadikan gerbang
 
-`biome check .` melaporkan **73 error** — hampir semuanya
-`lint/a11y/useButtonType` dan `noSvgWithoutTitle` pada komponen yang **tidak
-diubah sama sekali** saat repo ini dibuat. Repo portal (`asj-astro`) juga
-`exit 1` untuk perintah yang sama; di sana lint **tidak** digerbangi dengan
-`biome check`, melainkan dengan `scripts/ci/lint-ratchet.mjs` yang membandingkan
-jumlah diagnostik per berkas terhadap baseline `.ci/biome-baseline.json`.
-
-Baseline itu **belum dibawa ke sini**, jadi `npm run lint` di repo ini
-melaporkan utang apa adanya. Dua pilihan, keduanya untuk tahap berikutnya:
-port `lint-ratchet` + baseline-nya, atau beresi 73 error itu dan jadikan
-`npm run lint` gerbang yang benar-benar hijau. Yang **jangan** dilakukan:
-menghapus script-nya supaya terlihat hijau.
-
+`biome check .` melaporkan sejumlah diagnostik a11y (`useButtonType`,
+`noSvgWithoutTitle`) pada komponen yang belum disentuh. Repo ini melaporkan utang
+itu apa adanya alih-alih menyembunyikannya. Dua pilihan, keduanya pekerjaan yang
+belum diambil: beresi diagnostiknya sampai `npm run lint` benar-benar hijau, atau
+pasang ratchet per-berkas seperti yang dipakai repo asalnya. Yang **jangan**
+dilakukan: menghapus script-nya supaya terlihat hijau.
 
 ---
 
-## Asal-usul (provenance)
+## Teknologi
 
-Disalin **2026-09-30** dari working tree `asj-astro` (`github.com/asjosdokumen-alt/asj-astro`),
-HEAD `58efe33`, **termasuk perubahan yang saat itu belum di-commit**: pass polish
-halaman profil pada hari yang sama (13 gambar di-encode ulang ke lebar tampilnya,
-11 berkas sumber disunting). Jadi repo ini **bukan** snapshot dari commit mana pun
-di portal — ia snapshot dari working tree.
-
-`git log` di sini dimulai dari nol dan **tidak** memuat riwayat portal. Riwayat
-lengkapnya tetap ada di `asj-astro`.
-
----
-
-## Yang SENGAJA tidak dibawa
-
-| Tidak ada di sini | Alasan |
+| | |
 |---|---|
-| `netlify/` (Functions) | Backend portal. Halaman profil tidak punya backend sendiri — lihat catatan form di bawah. |
-| `src/pages/*.astro` selain `index` + `404` | Rute lain portal (loker, kandidat, admin, apply, ai-cv, master, siswa-baru, public, share). |
-| `src/components/{admin,candidate,forms}/`, `src/lib/cv-template-factory/` | Hanya dipakai rute-rute itu. |
-| `indexer/` | Toolchain indeks kode portal, termasuk tujuh counter berkas yang dibekukan. |
-| `e2e/` | Gate browser portal — semuanya mengukur rute yang tidak ada di sini. |
-| `migrations/`, `docs/` (sebagian besar), `deliverables/` | Skema database dan dokumentasi portal. |
+| Framework | Astro 5.12 (`output: static`), satu island Preact per bagian interaktif |
+| UI | Preact 10 + Tailwind CSS 4 (lewat plugin Vite, bukan integrasi Astro) |
+| State | Nanostores (`@nanostores/persistent` untuk tema dan bahasa) |
+| Font | Inter (UI) + Instrument Serif (judul display), di-host sendiri lewat `@fontsource` |
+| PWA | `manifest.webmanifest` + service worker dengan daftar precache yang dihasilkan saat build |
+| Form | Netlify Forms (tanpa Functions) |
 
-Yang **dibawa** dari `docs/`: `COMPANY_PROFILE_DATA.md` (sumber kebenaran data
-perusahaan) dan `ILLUSTRATION_SPEC.md` (spek aset ilustrasi). Keduanya dirujuk
-langsung oleh `src/lib/companyProfile.ts`, `src/lib/gallery.ts`, dan
-`scripts/ci/verify-assets.mjs`, jadi membuangnya akan meninggalkan rujukan
-menggantung.
+Tidak ada backend, tidak ada database, tidak ada SSR. `@astrojs/netlify` sengaja
+**tidak** dipakai: situs ini tidak punya Functions dan tidak punya permukaan SSR,
+jadi adapter itu hanya jadi dependensi yang tidak membeli apa pun.
 
-### Yang MASIH terbawa dan layak dirampingkan (tahap berikutnya)
+---
 
-Ini salinan setia, bukan versi ramping — jadi beberapa hal masih ikut yang
-sebenarnya milik portal:
+## Struktur
 
-- **`@supabase/supabase-js` + `src/lib/supabase.ts` + `src/lib/apiClient.ts` +
-  `src/store/userStore.ts` + `src/store/authReactive.ts`.** Terukur di portal:
-  klien Supabase **56,5 KB** ikut terunduh di rute publik. Ia masuk karena
-  `App.tsx` → `userStore` → `supabase` semuanya impor statis.
-- **`LoginModal.tsx`, `CekSiswaModal.tsx`, `components/admin/AdminAiCopilot.tsx`.**
-  Dirender oleh `App.tsx`; tidak ada gunanya di situs profil.
-- **Tautan header ke `/loker`, `/candidate`, `/admin`, `/public`** di `App.tsx`
-  dan `BottomNav.tsx` — keempat rute itu **tidak ada di repo ini**, jadi
-  tautannya menuju 404.
-- **`zod`** (lewat `schemas.ts`) dan `src/lib/fcm.ts`.
+```
+src/
+  pages/index.astro          halaman profil perusahaan — satu-satunya rute
+  pages/404.astro            halaman tidak-ditemukan
+  layouts/BaseLayout.astro   <head>, tema, i18n, service worker, JSON-LD, hreflang
+  components/App.tsx         hero, header, dan drawer navigasi (island)
+  components/public/*        seksi-seksi halaman (galeri, mitra, FAQ, kontak, …)
+  components/ui/*            Icon, Button, dan primitif bersama
+  lib/companyProfile.ts      DATA perusahaan — sumber kebenaran untuk teks
+  lib/{gallery,partners,faq,testimonials,siteMeta}.ts
+  store/i18n.ts, i18n-jp.ts  kamus Indonesia + Jepang
+  styles/*.css               global, theme, layout, motion
+public/
+  assets/                    foto fasilitas & galeri, ilustrasi, logo mitra
+  icons/                     favicon, ikon PWA, lambang ASJ, sprite
+docs/
+  COMPANY_PROFILE_DATA.md    data resmi perusahaan + aturan §11.2
+  ILLUSTRATION_SPEC.md       spek ukuran & isi ilustrasi
+  DEPLOY_NETLIFY.md          panduan deploy, langkah demi langkah
+netlify.toml                 konfigurasi build + header cache
+scripts/
+  build/strip-html-comments.mjs   pangkas komentar HTML dari build produksi
+  build-sw-manifest.mjs           tulis ulang precache service worker
+  ci/verify-assets.mjs            gate §11.2
+```
 
-### ✅ Form kontak — SELESAI 2026-09-30, lewat Netlify Forms
+---
 
-Catatan ini dulu berbunyi "tidak punya backend" dan itu benar sampai
-2026-09-30: `ContactForm.tsx` mengirim lewat `apiClient` ke
-`/.netlify/functions/kirimPesanKontak`, sementara `netlify/` sengaja tidak
-dibawa dari portal. Formulirnya merender dengan benar dan gagal di setiap
-pengiriman.
+## Data perusahaan — satu sumber kebenaran
 
-Pemilik memilih opsi 1 dari tiga pilihan yang dulu tercantum di sini. Sekarang
-formulirnya POST url-encoded ke `/` dengan field `form-name`, yang merupakan
-cara Netlify Forms menerima kiriman AJAX. `<form>` membawa
-`data-netlify="true"`, `name="kontak"`, dan `netlify-honeypot="perusahaan"`.
+Semua teks faktual tentang perusahaan berasal dari
+`docs/COMPANY_PROFILE_DATA.md` dan masuk ke halaman lewat
+`src/lib/companyProfile.ts`. **Jangan menulis angka perusahaan langsung di
+markup.**
 
-Dua hal yang ikut berubah dan perlu diketahui:
-
-- **Validasi pindah ke klien.** Server portal yang dulu memaksa batas panjang
-  dan **rate limit per nomor** tidak ada di sini, jadi keduanya hilang. Yang
-  tersisa: penyaring spam Netlify + honeypot, dan validasi di `submit()` yang
-  sopan-santun ke pengunjung, bukan kontrol. Dua kunci i18n baru
-  (`contact.err_required`, `contact.err_wa`) menampung pesannya.
-- **Form ini harus tetap ter-SSR.** Netlify mendeteksi form dengan memindai HTML
-  yang di-deploy, bukan dengan menjalankan JavaScript. `client:visible` tetap
-  di-SSR Astro sehingga markup-nya benar-benar ada di `dist/index.html` —
-  diperiksa di sana, bukan diasumsikan. Mengubahnya ke `client:only` akan
-  menghasilkan form yang tidak pernah dilihat Netlify.
-
-Panduan deploy lengkapnya, termasuk cara mengaktifkan notifikasi email:
-**`docs/DEPLOY_NETLIFY.md`**.
+Yang khusus: **tidak ada angka yang boleh dikarang.** Halaman ini tidak memuat
+jumlah kandidat, jumlah keberangkatan, atau jumlah mitra yang tidak tercatat di
+dokumen resmi — angka yang dikarang di halaman perusahaan adalah klaim hukum,
+bukan dekorasi. Tiga angka di hero (tahun pendirian, jumlah bidang penempatan,
+jumlah prefektur tujuan) ada karena ketiganya tercatat di dokumen.
 
 ---
 
 ## 🔴 Aturan foto — §11.2
 
 Repo ini **publik**, dan `public/assets/` memuat foto yang menampilkan wajah yang
-bisa dikenali — sebagian besar kandidat muda, sebagian mungkin di bawah umur.
-Aturan di `docs/COMPANY_PROFILE_DATA.md` §11.2: foto seperti itu **tidak boleh**
-masuk repo, karena publikasi lewat repo tidak bisa ditarik kembali.
+bisa dikenali. Aturan di `docs/COMPANY_PROFILE_DATA.md` §11.2: foto seperti itu
+**tidak boleh** masuk repo, karena publikasi lewat repo tidak bisa ditarik
+kembali.
 
-`.gitignore` menyebut **satu per satu** nama berkas yang dilarang — bukan satu pola
-direktori, karena `!` di bawah pola direktori adalah jaminan palsu (git tidak bisa
-me-*re-include* berkas bila direktori induknya sudah di-*exclude*; ini sudah
-dibuktikan, bukan diasumsikan).
+`.gitignore` menyebut **satu per satu** nama berkas yang dilarang — bukan satu
+pola direktori, karena `!` di bawah pola direktori adalah jaminan palsu: git
+tidak bisa me-*re-include* berkas bila direktori induknya sudah di-*exclude*.
+Ini sudah dibuktikan, bukan diasumsikan.
 
-Gate-nya: **`npm run verify:assets`** — memerahkan build bila daftar ignore, isi
-folder, dan yang benar-benar dirender `src/lib/gallery.ts` tidak lagi sinkron.
-Jalankan sebelum commit apa pun yang menyentuh `public/assets/`.
+Konsekuensinya disengaja: berkas baru di `public/assets/` **tidak pernah**
+otomatis ter-commit. Menambahkannya harus keputusan sadar, dan setiap penambahan
+harus lewat gate:
 
-Tiga belas foto yang ter-commit di sini sudah punya dasar publikasi yang tercatat
-di `src/lib/gallery.ts` (keputusan pemilik 2026-09-23). **Jangan menambah foto
-wajah baru tanpa keputusan itu.**
+```bash
+npm run verify:assets
+```
+
+Gate itu memerahkan build bila daftar ignore, isi folder, dan yang benar-benar
+dirender `src/lib/gallery.ts` tidak lagi sinkron. Jalankan sebelum commit apa pun
+yang menyentuh `public/assets/`.
 
 ---
 
-## Status deploy
+## Formulir kontak
 
-**Siap deploy, belum di-deploy.** Konfigurasinya sudah ada dan sudah di-commit:
-`netlify.toml` di root memuat perintah build, folder publish, versi Node, dan
-seluruh header cache — jadi dashboard Netlify tidak perlu diisi manual.
+`src/components/public/ContactForm.tsx` mengirim ke **Netlify Forms**: POST
+url-encoded ke `/` dengan field `form-name`, tanpa Functions. `<form>` membawa
+`data-netlify="true"` dan `netlify-honeypot="perusahaan"`.
 
-Portal asalnya (`asjastro.netlify.app`) **beku sejak 2026-09-24** karena kredit
-akun Netlify habis; setiap deploy setelahnya di-skip. Karena itu situs ini
-disiapkan untuk **akun Netlify dengan alamat email baru** dan kuota yang mulai
-dari nol, bukan menumpang akun yang sudah mentok.
+Dua hal yang mudah dirusak tanpa sadar:
 
-Langkah berikutnya, berurutan, ada di **`docs/DEPLOY_NETLIFY.md`** — termasuk
-alasan `PUBLIC_SITE_URL` baru boleh diisi **setelah** deploy pertama (nilainya
-dibaca saat build, dan canonical yang menunjuk origin yang salah lebih buruk
-daripada tidak ada canonical).
+- **Form ini harus tetap ter-SSR.** Netlify mendeteksi form dengan memindai HTML
+  yang di-deploy dan **tidak** menjalankan JavaScript. Island-nya dipasang dengan
+  `client:visible`, yang tetap di-SSR Astro — jadi markup-nya benar-benar ada di
+  `dist/index.html`. Mengubahnya ke `client:only` akan mengirim form yang tidak
+  pernah dilihat Netlify, dan setiap kiriman hilang dengan status 200.
+- **Validasi di sisi klien itu sopan-santun, bukan pengamanan.** Tidak ada server
+  yang memaksa batas panjang atau rate limit di repo ini. Yang tersisa: penyaring
+  spam Netlify + honeypot.
+
+Cara mengaktifkan notifikasi email dan melihat kiriman ada di
+[`docs/DEPLOY_NETLIFY.md`](docs/DEPLOY_NETLIFY.md) §6.
 
 ---
 
-## Peta berkas
+## Deploy
 
-```
-src/
-  pages/index.astro          halaman profil perusahaan — satu-satunya rute
-  pages/404.astro            halaman 404
-  layouts/BaseLayout.astro   <head>, tema, i18n, SW, JSON-LD, hreflang
-  components/App.tsx         shell: header, hero, drawer, BottomNav, modal
-  components/public/*        seksi-seksi halaman (galeri, mitra, FAQ, kontak, …)
-  lib/companyProfile.ts      DATA perusahaan — sumber kebenaran untuk teks
-  lib/{gallery,partners,faq,testimonials,siteMeta}.ts
-  store/i18n.ts, i18n-jp.ts  kamus ID + JP
-  styles/{global,theme,motion,layout}.css
-public/
-  assets/                    13 foto + ilustrasi (lihat §11.2 di atas)
-  icons/                     favicon, ikon PWA, lambang ASJ, sprite
-docs/
-  COMPANY_PROFILE_DATA.md    data resmi perusahaan + aturan §11.2
-  ILLUSTRATION_SPEC.md       spek ukuran & isi ilustrasi
-  DEPLOY_NETLIFY.md          panduan deploy ke Netlify, langkah demi langkah
-netlify.toml                 konfigurasi build + header cache (sumber kebenaran,
-                             bukan dashboard Netlify)
-scripts/
-  build/strip-html-comments.mjs   pangkas komentar HTML dari build produksi
-  build-sw-manifest.mjs           tulis ulang precache service worker
-  ci/verify-assets.mjs            gate §11.2
-```
+Netlify, dan seluruh konfigurasinya ada di `netlify.toml` — bukan di dashboard.
+Kalau dashboard menampilkan nilai yang berbeda, berkasnya yang benar.
+
+Satu hal di situ bukan pilihan gaya: `/assets/*` dan `/icons/*` memakai
+`max-age=0`, sementara `/_astro/*` memakai `immutable`. Aset di `/_astro/` ber-hash
+di namanya sehingga aman di-cache selamanya; yang di `/assets/` tidak. Dan
+`max-age=0` di sana adalah **syarat** agar service worker tetap benar, bukan
+kehati-hatian: handler-nya melayani aset statis dengan pola
+stale-while-revalidate lewat `fetch()`, dan panggilan itu ikut melewati HTTP
+cache — jadi `max-age` panjang akan membuat separuh "revalidate"-nya
+mengembalikan salinan basi dari cache browser sendiri.
+
+Langkah lengkapnya: [`docs/DEPLOY_NETLIFY.md`](docs/DEPLOY_NETLIFY.md).
+
+---
+
+## Lisensi & kontak
+
+Kode di repo ini milik PT Amanah Sakura Japan. Foto dan logo perusahaan tidak
+dilisensikan untuk dipakai ulang.
+
+- Situs: belum di-deploy
+- Email: lihat `CONTACT_EMAIL` di `src/lib/companyProfile.ts`

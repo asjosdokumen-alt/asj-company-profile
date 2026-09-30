@@ -1486,6 +1486,28 @@ export const translations: Record<Lang, Record<string, string>> = {
   "contact.err_wa": "Nomor WhatsApp tidak valid. Contoh: 0812-3456-7890.",
   "contact.privacy": "Balasan dikirim melalui WhatsApp pada hari kerja.",
 
+  // ── Navigasi section (drawer App.tsx) ─────────────────────────────────
+  // DITAMBAHKAN 2026-09-30, menggantikan empat tautan mati ke rute yang tidak
+  // dibangun repo ini (/loker, /candidate, /admin, /public).
+  //
+  // Sengaja PENDEK: ini label navigasi, bukan judul section. Memakai ulang
+  // `profile.*_title` akan membuat drawer berisi kalimat utuh ("Kenapa Memilih
+  // Jepang?") alih-alih menu, dan judul-judul itu memang sudah punya rumahnya
+  // sendiri di heading masing-masing section.
+  //
+  // Setiap kunci di sini harus punya padanan href di konstanta `NAV`
+  // (`src/components/App.tsx`), dan href itu harus punya id yang benar-benar ada
+  // di `index.astro` — tanpa itu, tautannya jadi anchor mati.
+  "nav.layanan": "Layanan",
+  "nav.program": "Program",
+  "nav.alur": "Alur Pendaftaran",
+  "nav.galeri": "Galeri",
+  "nav.legal": "Legalitas",
+  "nav.tim": "Tim",
+  "nav.mitra": "Mitra",
+  "nav.faq": "FAQ",
+  "nav.kontak": "Kontak",
+
   // ── Navigasi section (landing page L4) ────────────────────────────────
   // The desktop nav lists only sections that EXIST. "Layanan" and "Tentang" are
   // deliberately absent: `#layanan` is still a hidden tab panel (it becomes a real
@@ -2017,9 +2039,13 @@ export const translations: Record<Lang, Record<string, string>> = {
     // dictionaries or i18n.keys.test.ts fails, which is the point: a key that
     // only exists in `id` renders the key string itself in Japanese.
     "notfound.title": "Halaman tidak ditemukan",
-    "notfound.body": "Alamat yang Anda buka tidak ada atau sudah dipindahkan. Periksa kembali tautannya, atau mulai dari halaman lowongan.",
+    "notfound.body": "Alamat yang Anda buka tidak ada atau sudah dipindahkan. Periksa kembali tautannya, atau mulai dari halaman utama.",
     "notfound.home": "Ke Beranda",
-    "notfound.jobs": "Lihat Lowongan",
+    // `notfound.jobs` DIHAPUS 2026-09-30 bersama tautannya. Tombolnya menuju
+    // `/public/`, rute portal yang tidak dibangun di repo ini — jadi halaman 404
+    // menawarkan jalan buntu kedua kepada orang yang baru saja mengikuti tautan
+    // rusak. Digantikan tautan ke bagian kontak, yang benar-benar ada.
+    "notfound.contact": "Hubungi Kami",
 
     // ─── Document titles / <title> ───────────────────────────────────────────
     // WHY THESE EXIST SEPARATELY FROM THE `title=` PROP ON BaseLayout.

@@ -25,17 +25,19 @@ salah.
 
 ---
 
-## 1. Buat repo GitHub
+## 1. Repo GitHub
 
-Repo: **publik**, nama `asj-company-profile`.
+Repo sudah dibuat: **`asjosdokumen-alt/asj-company-profile`**, publik, branch
+default `main`.
 
 Publik itu keputusan sadar, dan gate-nya sudah dijalankan sebelum push:
 `npm run verify:assets` **PASS** — 18 berkas berwajah yang dilarang §11.2
 terblokir dari git, dan tidak ada satu pun yang bocor ke tracked files (diperiksa
-dengan membandingkan `git ls-files` terhadap `git check-ignore`, bukan diasumsikan).
+dengan membandingkan `git ls-files` terhadap `git check-ignore`, bukan
+diasumsikan).
 
 ```bash
-git push -u origin master
+git push origin main
 ```
 
 ---

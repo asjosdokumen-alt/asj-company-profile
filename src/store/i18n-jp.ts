@@ -1101,6 +1101,19 @@ export const jpTranslations: Record<string, string> = {
   "contact.err_wa": "WhatsApp番号の形式が正しくありません。例：0812-3456-7890",
   "contact.privacy": "お返事は営業日にWhatsAppにてお送りします。",
 
+  // ── セクションナビゲーション（ドロワー） ────────────────────────────
+  // 2026-09-30 追加。このリポジトリに存在しないルートへのリンク 4 本
+  // （/loker、/candidate、/admin、/public）を置き換えたもの。
+  "nav.layanan": "サービス",
+  "nav.program": "プログラム",
+  "nav.alur": "お申し込みの流れ",
+  "nav.galeri": "ギャラリー",
+  "nav.legal": "法的情報",
+  "nav.tim": "チーム",
+  "nav.mitra": "パートナー",
+  "nav.faq": "よくある質問",
+  "nav.kontak": "お問い合わせ",
+
   // ── ページ内ナビゲーション（ランディングページ L4） ──────────────────
   // 存在するセクションだけを並べる。`#layanan` はまだ非表示のタブパネル
   // （L5 のタブ→アンカー移行で実セクションになる）、`#tentang` はセクション自体が
@@ -1832,9 +1845,9 @@ export const jpTranslations: Record<string, string> = {
 
     // ─── 404 (src/pages/404.astro) ───────────────────────────────────────────
     "notfound.title": "ページが見つかりません",
-    "notfound.body": "お開きになったアドレスは存在しないか、移動されました。リンクをご確認いただくか、求人ページからお進みください。",
+    "notfound.body": "お開きになったアドレスは存在しないか、移動されました。リンクをご確認いただくか、ホームページからお進みください。",
     "notfound.home": "ホームへ",
-    "notfound.jobs": "求人を見る",
+    "notfound.contact": "お問い合わせ",
 
     // ─── 文書タイトル / <title> ─────────────────────────────────────────────
     // Server-rendered <title> stays Indonesian on purpose (crawlers and link

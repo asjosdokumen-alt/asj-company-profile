@@ -88,16 +88,28 @@ const waExam =
                </div>
            </div>
            
-           <!-- Aksi Pendaftaran -->
+           <!-- Aksi Pendaftaran — DIKURANGI 2026-09-30.
+                Tiga tombol, dua di antaranya tidak bisa bekerja di repo ini:
+
+                  · "Grup WA"            — tetap. Tautan eksternal, berfungsi.
+                  · "Cek Data"           — DIHAPUS. Ia men-dispatch
+                    `openCekSiswaModal`, yang membuka `CekSiswaModal.tsx`. Modal
+                    itu memanggil `/.netlify/functions/*`, dan `netlify/` sengaja
+                    tidak dibawa dari portal — jadi tombolnya membuka modal yang
+                    gagal di setiap pengiriman. Tidak ada padanan yang jujur untuk
+                    "cek data pendaftaran Anda" di situs statis tanpa backend, dan
+                    mengarahkannya ke kontak akan berbohong tentang apa yang
+                    dilakukannya. Dihapus, bukan dialihkan.
+                  · "Form Daftar Siswa"  — DIALIHKAN ke `#kontak`. Rutenya
+                    (`/siswa-baru`) tidak ada di repo ini, jadi tautannya menuju
+                    404. Bagian kontak adalah satu-satunya jalur pendaftaran yang
+                    benar-benar hidup di halaman ini. -->
            <div class="flex flex-col sm:flex-row gap-3 mt-auto">
                <Button href="https://chat.whatsapp.com/F0iP9xcdi4G8QDzn1U4bAH" target="_blank" variant="secondary" icon="whatsapp" block class="flex-1">
                    <span data-lang="landing.class_btn_wa">Grup WA</span>
                </Button>
-               <Button variant="secondary" icon="list-alt" block class="flex-1" onClick="window.dispatchEvent(new CustomEvent('openCekSiswaModal'))">
-                   <span data-lang="landing.class_btn_cek">Cek Data</span>
-               </Button>
-               <Button href="/siswa-baru" variant="primary" icon="edit" block class="flex-1">
-                   <span data-lang="landing.class_btn_form">Form Daftar Siswa</span>
+               <Button href="#kontak" variant="primary" icon="edit" block class="flex-1">
+                   <span data-lang="landing.class_btn_form">Hubungi Kami</span>
                </Button>
            </div>
        </div>

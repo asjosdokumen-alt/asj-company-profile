@@ -72,14 +72,8 @@ import { GALLERY } from '../lib/gallery';
    CheckList exists at all: four of these blocks were inline maps before it did. */
 ---
 
-<BaseLayout title="PT Amanah Sakura Japan — Job Portal" titleKey="doc.title_home" description="Lowongan kerja Jepang, penerimaan siswa baru, pengurusan visa, pendaftaran ujian JFT & SSW" showFooter={true}>
-  <!-- `hero` turns the header band into the landing page's hero. It also moves
-       the page's single h1 into the hero, so the company name in the header
-       steps down to a div — see the note in App.tsx. Every OTHER route mounts
-       the header without this flag and keeps the header h1, because for those
-       routes it is the only one.
-
-       WHY `client:load` AND NOT `client:only="preact"` — measured 2026-09-23.
+<BaseLayout title="PT Amanah Sakura Japan — Profil Perusahaan" titleKey="doc.title_home" description="Profil perusahaan PT Amanah Sakura Japan: program pemagangan dan Tokutei Ginou (SSW) ke Jepang, pelatihan bahasa, pengurusan visa, dan pendaftaran ujian JFT & SSW." showFooter={true}>
+  <!-- WHY `client:load` AND NOT `client:only="preact"` — measured 2026-09-23.
        `client:only` renders NO server HTML, so with JavaScript unavailable this
        page had **0 h1** and no header at all: the hero headline and the entire
        nav existed only after hydration. On a landing page that is the one
@@ -100,11 +94,12 @@ import { GALLERY } from '../lib/gallery';
        text on hydration. The measurement above is the check — 0 page errors on
        the default path, which is the path almost every visitor takes.
 
-       The gated routes (admin/candidate/apply/ai-cv/share/siswa-baru) keep
-       `client:only`: they are session-dependent SPAs that cannot function
-       without JavaScript, so server-rendering them would add weight and expose
-       gate markup for no reader's benefit. -->
-  <App client:load hero />
+       `App` takes NO PROPS as of 2026-09-30. It used to take `hero`, which
+       selected between two headers for a set of routes this repo does not build
+       (`/loker`, `/admin`, `/candidate`, `/share`). With the prop gone, the
+       comment that used to sit here about "every OTHER route" has nothing left
+       to describe. See the header of `src/components/App.tsx`. -->
+  <App client:load />
 
   <!-- THE BAND THAT USED TO SIT HERE IS GONE, AND ITS THREE PARTS WENT TOGETHER.
        Owner ruling 2026-09-25, verbatim: "ini kok masih ada bukannya saya suruh

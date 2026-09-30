@@ -1,6 +1,5 @@
 ---
 import Footer from '../components/Footer.astro';
-import BottomNav from '../components/BottomNav.tsx';
 import Toast from '../components/Toast.tsx';
 import HreflangLinks from '../components/public/HreflangLinks.tsx';
 import sprite from '../icons/sprite.svg?raw';
@@ -78,9 +77,8 @@ export interface Props {
   description?: string;
   lang?: string;
   showFooter?: boolean;
-  showBottomNav?: boolean;
   /**
-   * The i18n key for this page's document title, e.g. `doc.title_loker`.
+   * The i18n key for this page's document title, e.g. `doc.title_home`.
    *
    * It is passed as an ATTRIBUTE ON <html>, not on <title>, for two reasons:
    * a gate matches `/<title>([\s\S]*?)<\/title>/` and would break if that tag
@@ -92,7 +90,7 @@ export interface Props {
   titleKey?: string;
 }
 
-const { title, description = 'PT Amanah Sakura Japan — Job Portal', lang = 'id', showFooter = false, showBottomNav = false, titleKey } = Astro.props;
+const { title, description = 'PT Amanah Sakura Japan — Profil Perusahaan', lang = 'id', showFooter = false, titleKey } = Astro.props;
 
 // ─── Discovery metadata (JSON-LD + hreflang) ─────────────────────────────────
 // ADDED 2026-09-29. MEASURED that day: this site emitted 0 JSON-LD and 0
@@ -389,7 +387,14 @@ const orgJsonLd = jsonLdScript(
     <slot />
   
   {showFooter && <Footer />}
-  <BottomNav client:only="preact" show={showBottomNav} />
+
+  <!-- BottomNav was rendered here, gated on a `showBottomNav` prop. That prop
+       was never set to true by any page in this repo, so the component returned
+       `null` on every route while still shipping its JavaScript to every
+       visitor. It was the portal's admin/candidate tab bar — six icon buttons
+       that switch tabs on `/admin` and three that link to `/public` and
+       `/candidate`, none of which exist here. Removed 2026-09-30 with the
+       component itself. -->
 
   <!-- Mounted here, once, so it can never be forgotten on a new page.
        It was previously duplicated onto 6 of 9 pages, leaving
@@ -397,12 +402,9 @@ const orgJsonLd = jsonLdScript(
   <Toast client:only="preact" />
   
   <script>
-    // ─── Fase 3 (Reactive): Auth restore via authReactive.ts ───
-    // Nanostores handles cross-tab sync + session expiry automatically.
-    // This script only does DOM manipulation for Astro static elements
-    // (Header nav modes) that aren't Preact components yet.
-    // ─── Auth managed by Nanostores (authReactive.ts) ───
-    // ─── Fase 5: Service Worker + Auto-Reload ───
+    // ─── Service Worker + Auto-Reload ───
+    // The auth-restore block that used to sit above this was the portal's
+    // Nanostores session plumbing; it is gone with `authReactive.ts`.
     if ('serviceWorker' in navigator) {
       if (location.hostname.includes('localhost') || location.hostname.includes('127.0.0.1')) {
         navigator.serviceWorker.getRegistrations().then(function(regs) {
