@@ -1,0 +1,28 @@
+# ── Line endings for Node script modules ─────────────────────────────────────
+#
+# The repo uses core.autocrlf=true, so a fresh clone on Windows gets CRLF in the
+# working tree. That is harmless for the site, but NOT for the Node ESM scripts
+# under scripts/: vitest's transform fails on a CRLF .mjs with a bare
+# "SyntaxError: Invalid or unexpected token" and no location — while Node itself
+# imports the exact same file without complaint.
+#
+# Reproduced in the portal (asj-astro) on 2026-09-12: identical content failed
+# with CRLF and passed with LF. Pinning these to LF makes it deterministic
+# instead of depending on how the working tree happened to be checked out. Git
+# already stores them as LF, so this changes nothing about the committed content.
+*.mjs text eol=lf
+*.cjs text eol=lf
+
+# ── Shell scripts, for a different and sharper reason ────────────────────────
+#
+# A CRLF shell script is already wrong on principle, but the concrete damage is
+# worse than a stray `\r` in a message: helpers that pass multi-line string
+# anchors through the ENVIRONMENT and assert "exactly one match" before writing
+# miss every anchor in a CRLF working tree. The loud case is a hard ABORT; the
+# bad case is a helper that does not assert, where the file is rewritten
+# unchanged and the check stays green — indistinguishable from a real hole.
+#
+# The portal carries this rule for its mutation batteries. This repo has no
+# batteries, but the rule is kept: it is the same class of local-only,
+# checkout-dependent failure, and it costs nothing to be deterministic.
+*.sh text eol=lf

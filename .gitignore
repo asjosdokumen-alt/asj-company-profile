@@ -3,6 +3,14 @@ dist/
 .astro/
 .env
 .env.*
+# `.env.*` above also swallows `.env.example`, which MUST be committed — it is
+# the shape documentation, and the build's own warning tells the reader to copy
+# it. Gitignore resolves by the LAST matching rule, so the negation goes after.
+# Measured with `git check-ignore -v .env.example` before and after: without this
+# line it matched `.gitignore:5:.env.*` and would never have been committed.
+# (`!` works here because the parent directory is not excluded — that is the
+# same distinction the §11.2 block below spells out, in the other direction.)
+!.env.example
 *.log
 test-results/
 .DS_Store
