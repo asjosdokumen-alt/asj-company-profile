@@ -1,0 +1,553 @@
+---
+import Footer from '../components/Footer.astro';
+import BottomNav from '../components/BottomNav.tsx';
+import Toast from '../components/Toast.tsx';
+import HreflangLinks from '../components/public/HreflangLinks.tsx';
+import sprite from '../icons/sprite.svg?raw';
+import { hreflangAlternates, organizationJsonLd, jsonLdScript, absoluteUrl } from '../lib/siteMeta';
+import {
+  CONTACT_ADDRESS,
+  CONTACT_EMAIL,
+  CONTACT_PHONES,
+  CONTACT_INSTAGRAM,
+  CONTACT_TIKTOK,
+  CONTACT_MAPS_URL,
+  MAPS_LAT,
+  MAPS_LNG,
+} from '../lib/companyProfile';
+import '@fontsource/inter/latin-400.css';
+import '@fontsource/inter/latin-600.css';
+import '@fontsource/inter/latin-700.css';
+// Weight 900 was MISSING while `font-black` was used 64 times across src/ —
+// measured 2026-09-19: the only declared faces were 400/600/700
+// (`font-weight:` in @fontsource/inter/latin-{400,600,700}.css), so every
+// "black" heading resolved to the nearest declared weight (700) and the intended
+// 700-vs-900 hierarchy did not exist anywhere in the app. Cost of the fix is
+// measured, not guessed: `inter-latin-900-normal.woff2` is 23.3 KB, taking the
+// four declared weights from 70.8 KB to 94.1 KB.
+//
+// Weight 800 (`font-extrabold`, 21 usages) is deliberately NOT added yet: it
+// would cost a further 23.8 KB for a tier that reads almost identically to 900.
+// The two ways out — add the face, or migrate those 21 usages to `font-black` —
+// are recorded in DESIGN.md §3.3 and belong with the typography work in L2/L3,
+// not in the foundation phase, because 21 call sites are spread across admin and
+// candidate screens and changing them all is a broader visual change than this
+// phase should carry.
+import '@fontsource/inter/latin-900.css';
+
+// ─── The DISPLAY face — Instrument Serif, latin, weight 400, ONE weight ───
+//
+// Owner request 2026-09-27: the landing hero becomes a full-screen band with
+// an oversized serif display headline, from a reference short. This is the
+// repo's second font family and the first time a face has been added for
+// anything other than Inter's own weight ladder.
+//
+// MEASURED COST, the same standard the Inter 900 note above set:
+//   instrument-serif-latin-400-normal.woff2   20.5 KB   ← what a browser fetches
+//   instrument-serif-latin-400-normal.woff    17.9 KB   ← the @font-face's
+//                                                          legacy fallback;
+//                                                          never fetched by a
+//                                                          browser that supports
+//                                                          woff2 (unusually it is
+//                                                          the SMALLER file here,
+//                                                          so this face costs no
+//                                                          more on old engines
+//                                                          either)
+// That is 2.8 KB LESS than the Inter 900 face (23.3 KB) this file already
+// accepted, and it is the family's ONLY weight — there is no second weight to
+// justify, because `@fontsource/instrument-serif` ships 400 alone.
+//
+// WHY A SEPARATE FAMILY AND NOT A HEAVIER INTER. The reference headline is a
+// high-contrast editorial serif; Inter has no serif and its 900 weight is a
+// grotesque doing a display face's job. Why this face over DM Serif Display
+// (24.2 KB) or Fraunces (variable, 1.8 MB package) is recorded in
+// `theme.css` next to `--font-display`, which is where the choice lives.
+//
+// SCOPE: `--font-display` is a DISPLAY utility, applied to exactly one element
+// today (the hero h1). Body copy, section titles, cards, forms and tables stay
+// Inter — `--font-sans` is unchanged and still feeds preflight.
+//
+// ⚠ It is imported as `latin-400.css`, NOT `400.css`. The bare entry pulls in
+// latin + latin-ext + every other subset, which would add the latin-ext face
+// (11.3 KB) and a set of subsets this page's copy never uses. The Inter imports
+// above are latin-only for the same reason.
+import '@fontsource/instrument-serif/latin-400.css';
+
+export interface Props {
+  title: string;
+  description?: string;
+  lang?: string;
+  showFooter?: boolean;
+  showBottomNav?: boolean;
+  /**
+   * The i18n key for this page's document title, e.g. `doc.title_loker`.
+   *
+   * It is passed as an ATTRIBUTE ON <html>, not on <title>, for two reasons:
+   * a gate matches `/<title>([\s\S]*?)<\/title>/` and would break if that tag
+   * grew an attribute; and `data-*` on <html> is exactly what the rest of this
+   * layout's i18n already uses. `applyDocTitle()` reads it and assigns
+   * `document.title` after hydration, so the server-rendered Indonesian value
+   * (correct for crawlers) stops being the only value a JP reader ever sees.
+   */
+  titleKey?: string;
+}
+
+const { title, description = 'PT Amanah Sakura Japan — Job Portal', lang = 'id', showFooter = false, showBottomNav = false, titleKey } = Astro.props;
+
+// ─── Discovery metadata (JSON-LD + hreflang) ─────────────────────────────────
+// ADDED 2026-09-29. MEASURED that day: this site emitted 0 JSON-LD and 0
+// hreflang while 3 of 6 MoU partner sites emit JSON-LD and two emit hreflang.
+// We have the fullest bilingual content of the seven, so the missing hreflang
+// was discarding a real advantage. See siteMeta.ts for why the origin is an
+// env var, and docs/COMPANY_PAGE_ASSESSMENT_2026-09-29.md §3.7.
+//
+// ⚠ BOTH ARE OPTIONAL BY DESIGN. With no `PUBLIC_SITE_URL` set (every local
+// build, every test) `siteOrigin()` returns null and both blocks emit nothing.
+// That is deliberate: an absolute URL guessed wrong points crawlers at a FROZEN
+// host — this project's host has already moved twice — which is worse than
+// emitting none. So a missing block here is a config state, not a bug.
+//
+// The JP counterpart of `/` is the same route with the language switched in the
+// browser (`data-lang` + translateDataLang), not a separate path, so the
+// alternate points at `/?lang=jp`. That is the parameter the language store
+// reads; see src/store/langStore.ts.
+const alternates = hreflangAlternates({ id: '/', jp: '/?lang=jp' });
+const canonical = absoluteUrl('/');
+const orgJsonLd = jsonLdScript(
+  organizationJsonLd({
+    name: 'PT Amanah Sakura Japan',
+    description:
+      'LPK (Lembaga Pelatihan Kerja) bahasa Jepang di Ponorogo, Jawa Timur. Pelatihan bahasa dan budaya Jepang, serta persiapan penempatan kerja ke Jepang.',
+    streetAddress: CONTACT_ADDRESS.text,
+    telephone: CONTACT_PHONES[0],
+    email: CONTACT_EMAIL,
+    latitude: MAPS_LAT,
+    longitude: MAPS_LNG,
+    sameAs: [
+      `https://www.instagram.com/${CONTACT_INSTAGRAM}`,
+      `https://www.tiktok.com/@${CONTACT_TIKTOK}`,
+      CONTACT_MAPS_URL,
+    ],
+  }),
+);
+---
+<!DOCTYPE html>
+<html lang={lang} data-title-key={titleKey}>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- The document title. This was MISSING until 2026-09-17: the `title` prop
+       was destructured above and then never rendered, so every page shipped
+       with no <title> at all — verified 0 occurrences across all 10 built
+       pages. The browser tab showed the URL, search results had no title, and
+       screen readers announced the document without one (WCAG 2.4.2 "Page
+       Titled" is Level A). Nothing looked wrong, which is why it survived.
+
+       It also made a gate's exemption a false premise: i18n.keys.test.ts
+       deliberately skips the title prop passed to this layout, on the grounds
+       that it is "the document title: server-rendered SEO metadata that
+       translateDataLang() cannot touch". That reasoning was sound and the
+       premise was not — those strings were reaching nothing.
+
+       Note for anyone editing this comment: the indexer parses .astro template
+       tags including the ones inside HTML comments, so a literal capitalised
+       tag written here becomes a phantom unresolved reference and
+       indexer/src/build.test.ts fails with "expected [...] to have a length of
+       +0 but got 1". That is exactly how this paragraph was caught.
+
+       Server-rendered on purpose: translateDataLang() runs in the browser and
+       cannot rewrite a <title> for a crawler or a shared link preview. -->
+  <title>{title}</title>
+  <meta name="description" content={description} />
+
+  {/* ─── hreflang + JSON-LD (added 2026-09-29) ──────────────────────────────
+       Both render only when PUBLIC_SITE_URL resolves to a real origin; see the
+       note in the frontmatter and siteMeta.ts. When it does not, the component
+       and the conditional below emit nothing at all, which is the intended
+       state on a local build.
+
+       WHY THE ALTERNATES ARE A `.tsx` COMPONENT AND NOT AN INLINE `.map()`:
+       iterating in an `.astro` template reports the callback parameter as an
+       unresolved global, which `indexer/src/build.test.ts` forbids outside test
+       files. This was MEASURED here, not assumed — the inline version produced
+       exactly two `global-unknown` refs, both the name `a`. The repo already
+       records this rule at src/pages/index.astro:63; see HreflangLinks.tsx for
+       the full reasoning. Do not inline it back.
+
+       NOTE FOR ANYONE EDITING THESE COMMENTS: the indexer parses Astro template
+       tags INCLUDING the ones inside HTML comments (see the long note above the
+       title element). A literal capitalised tag written in a comment here
+       becomes a phantom unresolved reference and indexer/src/build.test.ts
+       fails. That is why these comments name elements in lower case in prose
+       instead of writing them as tags. */}
+  {canonical && <link rel="canonical" href={canonical} />}
+  <HreflangLinks alternates={alternates} />
+  {orgJsonLd && (
+    <script type="application/ld+json" set:html={orgJsonLd} />
+  )}
+  <meta name="theme-color" content="#020617" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ASJ Portal" />
+  <meta name="referrer" content="no-referrer" />
+  <base target="_top" />
+  
+  <!-- Icons are served locally (public/icons/). They used to point at a
+       Supabase Storage URL, which meant a 404/slow load whenever the storage
+       bucket was unreachable and made the PWA un-installable offline.
+       They are now the PT Amanah Sakura Japan emblem, rasterised by
+       `npm run icons:pwa`. There is deliberately no icon.svg any more: the
+       emblem is a raster, and an SVG wrapper could only carry the same PNG
+       base64-encoded inside a larger file. -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  
+  <!-- Icons: inline SVG sprite (155 glyphs subsetted from Font Awesome).
+       Inlined rather than referenced via <use href="/sprite.svg#id"> because
+       cross-document <use> is unreliable on older iOS Safari / Android
+       WebView, which is a large share of this audience. -->
+  <div id="asj-sprite" aria-hidden="true" style="display:none" set:html={sprite} />
+
+  <!-- Inter is self-hosted via @fontsource (see imports above).
+       This replaces a render-blocking Google Fonts stylesheet that loaded
+       Montserrat — a family the stylesheet never actually referenced. -->
+
+  <style is:global>
+    @import '../styles/global.css';
+  </style>
+<script is:inline>
+
+    // ─── Theme restore (before paint, avoids a flash of the wrong theme) ───
+    // Writes `data-theme` (new token system, see styles/theme.css).
+    //
+    // DEFAULT IS LIGHT as of 2026-09-20 (owner decision — the landing page ships
+    // the pink sakura palette). This script MUST stay inline and MUST NOT import
+    // `DEFAULT_THEME`: it runs before any module loads, which is the whole point.
+    // It is therefore the one place the default is a literal, and it duplicates
+    // src/store/theme.ts by necessity. Change both together or the page flashes
+    // the wrong theme on every load.
+    (function(){
+      try {
+        var t = localStorage.getItem("asjTheme");
+        document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+
+    // ─── Scrollbar gutter width (see styles/global.css + layout.css §3b) ───
+    // `html { scrollbar-gutter: stable }` prevents a page shift when a modal
+    // toggles `overflow: hidden`, but it also narrows the initial containing
+    // block, which made `position: fixed` overlays stop ~15px short of the
+    // physical viewport edge on Windows/Linux.
+    //
+    // The reserved width CANNOT be expressed in CSS — it depends on the
+    // platform's scrollbar style (overlay vs classic), which no media query
+    // exposes. So it is measured once here and published as a custom
+    // property that the overlay rules consume.
+    //
+    // MEASURED CAREFULLY: `clientWidth` does NOT report this gutter
+    // (it read 1280 on a 15px-gutter page, giving a wrong "0px" answer
+    // that silently disabled the fix). The reliable signal is the
+    // difference between the viewport width and the WIDTH OF THE <html>
+    // BOX ITSELF, which is what the gutter actually shrinks. Verified
+    // against a bare `position: fixed; right: 0` probe: at innerWidth
+    // 1280 that probe landed on 1265, and `offsetWidth`/`getBoundingClientRect`
+    // on <html> both read 1265 — so this is the measurement that matches
+    // the browser's own positioning maths.
+    //
+    // 0px on overlay-scrollbar platforms (macOS/iOS/Android), where the
+    // correction is a no-op.
+    (function(){
+      var root = document.documentElement;
+      var read = function(){
+        try {
+          var w = window.innerWidth;
+          // getBoundingClientRect().width is unaffected by fractional
+          // padding/borders on <html>, unlike clientWidth.
+          var box = root.getBoundingClientRect().width;
+          var gutter = Math.round(w - box);
+          root.style.setProperty("--u-scrollbar-gutter", gutter > 0 ? gutter + "px" : "0px");
+        } catch (e) {
+          root.style.setProperty("--u-scrollbar-gutter", "0px");
+        }
+      };
+      read();
+      // A window can move between overlay and classic scrollbars (docked
+      // vs undocked display), and the first read can precede layout on a
+      // slow boot, so re-read on both signals.
+      window.addEventListener("resize", read, { passive: true });
+      window.addEventListener("load", read, { passive: true });
+    })();
+
+    // ─── Entrance animations: opt-in flag, set BEFORE FIRST PAINT ──────────
+    // See styles/motion.css §9. This does two things and nothing else:
+    //
+    //   1. Marks the document as JS-capable. The hidden start state in
+    //      motion.css is gated behind this class, so with scripting off every
+    //      card is plainly visible instead of waiting for an observer that
+    //      will never be created.
+    //   2. Hands the IntersectionObserver off to a deferred function, so the
+    //      observer setup itself does not block the first paint.
+    //
+    // WHY THE CLASS GOES ON IN THIS SCRIPT AND NOT IN A MODULE
+    // There is exactly one frame budget between this line and first paint.
+    // Adding the class later — on DOMContentLoaded, from a bundled module —
+    // means the browser paints every card VISIBLE first, then this class
+    // arrives and hides them, then the observer reveals them again. That
+    // flash-then-vanish is a worse artefact than having no animation.
+    //
+    // The reveal pass runs after `load` because the page's own data (job
+    // count, announcement) rewrites parts of the DOM before then, and
+    // observing nodes that are about to be replaced would reveal nothing.
+    (function(){
+      var root = document.documentElement;
+      if (!("IntersectionObserver" in window)) return;   // no flag: cards just show
+      root.classList.add("js-reveal");
+
+      // A Set, not an array of unique keys: elements are compared by identity.
+      var seen = [];
+      var MARK = "is-revealed";
+
+      function reveal(el){ el.classList.add(MARK); }
+
+      function pass(){
+        // ── TWO ATTRIBUTES, TWO SCALES, ONE OBSERVER ─────────────────────
+        // `[data-reveal]` marks an ITEM inside a section (a card, a tile, a
+        // row) and is staggered — see motion.css §9. `[data-enter]` marks a
+        // whole SECTION BAND and runs once, un-staggered — see §9b. They are
+        // separate attributes rather than one because the vocabulary differs
+        // (a band has an entrance KIND, an item does not) and because an
+        // element carrying both would run two animations on itself.
+        var targets = document.querySelectorAll("[data-reveal], [data-enter]");
+        if (!targets.length) return;
+        var pending = [];
+        for (var i = 0; i < targets.length; i++) {
+          var el = targets[i];
+          // `data-reveal` uses `is-revealed`; `data-enter` uses `is-entered`.
+          // Two markers because the CSS state selectors are different shapes
+          // (`html.js-reveal [data-enter="rise"].is-entered`), and collapsing
+          // them into one class would make a band that carried both attributes
+          // mark itself revealed while its entrance had not run.
+          var mark = el.hasAttribute("data-enter") ? "is-entered" : MARK;
+          if (el.classList.contains(mark)) continue;
+          // Anything already on screen at first paint is revealed IMMEDIATELY
+          // rather than observed. Observing it would make above-the-fold
+          // content wait for the observer's first callback — one frame of
+          // blank, on exactly the content the visitor is looking at.
+          var box = el.getBoundingClientRect();
+          if (box.top < (window.innerHeight || 0) && box.bottom > 0) el.classList.add(mark);
+          else pending.push(el);
+        }
+        if (!pending.length) return;
+        var observer = new IntersectionObserver(function(entries){
+          for (var j = 0; j < entries.length; j++) {
+            if (!entries[j].isIntersecting) continue;
+            var t = entries[j].target;
+            t.classList.add(t.hasAttribute("data-enter") ? "is-entered" : MARK);
+            // Unobserve: these animations run once. Leaving it attached would
+            // re-fire them every time the element scrolled back into view,
+            // which reads as a flicker rather than an entrance.
+            observer.unobserve(t);
+          }
+        }, {
+          // Start the animation slightly BEFORE the element is fully visible,
+          // so it has settled by the time it is properly in frame. A card
+          // that begins moving as it arrives is still moving when you look
+          // at it; a 12% head start fixes that.
+          rootMargin: "0px 0px -12% 0px",
+          threshold: 0,
+        });
+        for (var k = 0; k < pending.length; k++) observer.observe(pending[k]);
+        seen.push(observer);
+      }
+
+      window.__asjReveal = pass;
+      if (document.readyState === "complete") pass();
+      else window.addEventListener("load", pass, { passive: true });
+
+    })();
+  </script>
+</head>
+<!-- PERF: the theme swap used to transition for 500ms. `background-color`
+     on <body> is a full-viewport paint, so that was ~30 full-screen
+     repaints per toggle. 200ms is still smooth (the curve is out-expo,
+     which lands early) and cuts the repaint work by 60%. -->
+<body id="asj-body" class="bg-canvas text-fg min-h-screen transition-colors duration-200 flow-root">
+  <div id="global-loader" style="display: none !important;">
+    <svg class="asj-icon animate-spin text-5xl text-pink-500 mb-4" width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false"><use href="#fas-spinner" /></svg>
+    <h2 class="text-xl font-bold tracking-widest text-slate-200" data-lang="ui.loader_title">MEMUAT ASJ OS V7...</h2>
+    <p id="loader-msg" class="text-sm text-slate-500 mt-2 mb-6" data-lang="ui.loader_msg">Mempersiapkan UI Modern</p>
+    <button onclick="document.getElementById(&quot;global-loader&quot;).style.display=&quot;none&quot;" class="px-6 py-2.5 bg-red-600 hover:bg-red-500 border border-red-500 rounded-full text-sm font-bold text-white transition-colors shadow-lg"><svg class="asj-icon mr-1" width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false"><use href="#fas-times" /></svg> <span data-lang="ui.force_close_loading">Tutup Paksa Loading</span></button>
+  </div>
+  <div id="sakura-particles" class="fixed inset-0 u-modal-shell overflow-hidden hidden" aria-hidden="true"></div>
+  <a href="#main-content" class="skip-link"><span data-lang="ui.skip_to_content">Lewati ke konten utama</span></a>
+  
+    <slot />
+  
+  {showFooter && <Footer />}
+  <BottomNav client:only="preact" show={showBottomNav} />
+
+  <!-- Mounted here, once, so it can never be forgotten on a new page.
+       It was previously duplicated onto 6 of 9 pages, leaving
+       showToast() a silent no-op on ai-cv, master and share. -->
+  <Toast client:only="preact" />
+  
+  <script>
+    // ─── Fase 3 (Reactive): Auth restore via authReactive.ts ───
+    // Nanostores handles cross-tab sync + session expiry automatically.
+    // This script only does DOM manipulation for Astro static elements
+    // (Header nav modes) that aren't Preact components yet.
+    // ─── Auth managed by Nanostores (authReactive.ts) ───
+    // ─── Fase 5: Service Worker + Auto-Reload ───
+    if ('serviceWorker' in navigator) {
+      if (location.hostname.includes('localhost') || location.hostname.includes('127.0.0.1')) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          regs.forEach(function(r) { r.unregister(); });
+          caches.keys().then(function(ks) { ks.forEach(function(k) { caches.delete(k); }); });
+        });
+      } else {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+          setInterval(() => { reg.update().catch(() => {}); }, 5 * 60 * 1000);
+        }).catch(() => {});
+        navigator.serviceWorker.addEventListener('message', (e) => {
+          if (e.data?.type === 'ASJ_FORCE_RELOAD') {
+            console.log('[SW] New version — reloading...');
+            window.location.reload();
+          }
+        });
+      }
+    }
+  </script>
+<script>
+  import { translateDataLang, preloadJpDict, applyDocTitle } from '../store/i18n';
+  // Preload JP dictionary on client boot and run initial DOM translation
+  preloadJpDict();
+  translateDataLang();
+  // The <title> is server-rendered Indonesian (crawlers and link previews need
+  // it in the HTML and cannot run JS), so it has to be re-applied here for a
+  // reader who chose Japanese. Without this the tab, the bookmark and the
+  // history entry stayed Indonesian for ever — measured 2026-09-27: all 7
+  // routes had an identical document.title in both languages.
+  applyDocTitle();
+  // i18n: listen for language changes and translate [data-lang] elements instantly
+  window.addEventListener("asj-lang-change", function() {
+    translateDataLang();
+    applyDocTitle();
+  });
+  window.addEventListener("storage", function(e) {
+    if (e.key === "asj_lang") {
+      translateDataLang();
+      applyDocTitle();
+    }
+  });
+</script>
+<script>
+  /* ─── Sakura petals — the falling-leaves layer ───────────────────────
+     RESTORED 2026-09-25 (owner request, item 6). The behaviour is
+     recovered verbatim from the legacy app:
+       js/init/theme.ts:118-160   the generator + the on/off toggle
+       src/main.css:1960-2009     the petal CSS + both keyframes
+       src/main.css:2118-2131     the reduced-motion override
+     so the port and the original cannot drift.
+
+     WHY THIS LIVES IN BaseLayout AND NOT JapanTexture.astro
+     ------------------------------------------------------
+     `JapanTexture` is an inline-SVG TILE PATTERN — one bounded decorative
+     band (64px `asanoha`/`seigaiha`/sakura motif) that a section opts into
+     and positions inside its own box; it is used on exactly one route
+     (`src/pages/index.astro`). The falling petals are the opposite: a
+     FREE-FLOATING, full-viewport, position-fixed layer that must appear
+     on every public page (`/`, `/loker`, `/public`). Folding them into the
+     tile component would (a) tie a page-wide layer to a component that
+     owns no page-wide state, and (b) mean three copies of the generator,
+     one per route. BaseLayout is the ONE shell every route shares, and it
+     ALREADY renders the container `#sakura-particles` (line ~262) — this
+     script is the missing other half that makes that container live.
+
+     STRUCTURE
+     ---------
+       1. `makePetals()`  — the 30-petal generator (legacy `buatPartikelSakura`).
+       2. `apply(mode)`   — legacy `setSakuraParticles(theme === 'SAKURA')`:
+                            the layer is visible ONLY on the light theme.
+       3. a `themeStore` subscription + a one-shot boot call.
+
+     ⚠ NO ANGLE-BRACKET GENERICS ANYWHERE IN THIS FILE, including in this
+     comment — the indexer parses `.astro` template tags out of comments
+     too, and a quoted generic becomes a phantom unresolved component that
+     fails `indexer/src/build.test.ts`. This file already warns about the
+     same trap near the top.
+
+     THE GUARD IS LOAD-BEARING. Legacy used a module-level
+     `SAKURA_PETALS_CREATED` boolean so the 30 petals are built ONCE. A
+     theme toggle fires the subscription on EVERY change, so without it the
+     layer would grow by 30 nodes per toggle — 60, 90, 120 — and the
+     animation would visibly thicken until the page bogged down. */
+  import { themeStore } from '../store/theme';
+
+  const PETAL_COUNT = 30;
+  let petalsCreated = false;
+
+  function box(): HTMLElement | null {
+    return document.getElementById('sakura-particles');
+  }
+
+  function makePetals(): void {
+    const host = box();
+    /* `petalsCreated` is checked BEFORE the `host` guard so a very early
+       call (before the container is parsed) does not consume the one-shot
+       flag and leave the layer permanently empty. */
+    if (!host || petalsCreated) return;
+    petalsCreated = true;
+    for (let i = 0; i < PETAL_COUNT; i++) {
+      const p = document.createElement('div');
+      p.className = 'sakura-petal';
+      /* Three depth layers (legacy `isHero` / `isFar`):
+           hero  every 9th  — large, opaque, fast  (reads as near the camera)
+           far   every 7th  — small, blurred, slow (reads as depth)
+           rest            — mid */
+      const isHero = i % 9 === 0;
+      const isFar = i % 7 === 0;
+      const size = isFar ? 5 + Math.random() * 4 : isHero ? 16 + Math.random() * 8 : 8 + Math.random() * 9;
+      p.style.width = size + 'px';
+      p.style.height = size * (0.8 + Math.random() * 0.3) + 'px';
+      p.style.left = Math.random() * 100 + '%';
+      p.style.opacity = (isHero ? 0.5 + Math.random() * 0.25 : 0.15 + Math.random() * 0.35).toFixed(2);
+      p.style.animationDuration = (isHero ? 7 + Math.random() * 5 : 6 + Math.random() * 13) + 's';
+      /* NEGATIVE delay: each petal starts mid-flight, so the sky is
+         populated from the first frame instead of filling up over 24s. */
+      p.style.animationDelay = -Math.random() * 24 + 's';
+      /* Two fall tracks; the 45% split keeps them from moving in lockstep. */
+      p.style.animationName = Math.random() < 0.45 ? 'sakuraFall2' : 'sakuraFall';
+      p.style.transform = 'rotate(' + Math.random() * 360 + 'deg)';
+      if (isFar) p.style.filter = 'blur(' + (0.4 + Math.random() * 0.8).toFixed(1) + 'px)';
+      host.appendChild(p);
+    }
+  }
+
+  function apply(mode: string | undefined): void {
+    const host = box();
+    if (!host) return;
+    /* Only the light/"SAKURA" theme shows petals. `themeStore` is the
+       single source of truth for dark/light (see src/store/theme.ts); the
+       banner's SAKURA/TOKYO artwork is a SEPARATE store that the user can
+       override independently, so it is deliberately not consulted here. */
+    if (mode === 'light') {
+      makePetals();
+      host.classList.remove('hidden');
+    } else {
+      host.classList.add('hidden');
+    }
+  }
+
+  /* Subscribe first, then read the current value: `persistentAtom` has
+     already decoded `asjTheme` from localStorage by import time, so the
+     one-shot call paints the right state without waiting for a change. */
+  themeStore.subscribe((mode) => apply(mode));
+  apply(themeStore.get());
+</script>
+</body>
+</html>

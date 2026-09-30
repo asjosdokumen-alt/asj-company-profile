@@ -1,0 +1,166 @@
+---
+// Footer.astro — Redesigned: modern multi-column layout with CSS gradients.
+//
+// WHAT CHANGED AND WHY
+// --------------------
+// The old footer relied on an external Supabase background image
+// (tokyo_footer.jpg / sakura_footer.webp), which caused three problems:
+// 1. A 150 KB image fetch on every page load.
+// 2. A CDN dependency — Supabase outage = blank footer.
+// 3. Theme-lag: the footer's artwork listener sometimes fired after the
+//    header's, leaving a TOKYO footer under a SAKURA header for one frame.
+//
+// The redesign uses CSS gradients (`--footer-gradient` from theme.css) and
+// a multi-column layout. Zero external images, theme-responsive by default,
+// and the footer matches modern company profile trends (2026).
+//
+// PRESERVED
+// ---------
+// - All data imports from companyProfile.ts (phones, WA, Instagram, etc.)
+// - All i18n `data-lang` attributes
+// - All social link URLs and `id` attributes (for e2e targeting)
+// - The `footer-gps` id on the Google Maps link (its href comes from
+//   `CONTACT_MAPS_URL` in companyProfile.ts, one source shared with `#lokasi`)
+import Icon from './ui/Icon';
+import { CONTACT_INSTAGRAM, CONTACT_MAPS_URL, CONTACT_PHONES, CONTACT_WHATSAPP, CONTACT_EMAIL, CONTACT_ADDRESS } from '../lib/companyProfile';
+
+const TEL_HREF = (raw: string) => `tel:+62${raw.replace(/\D/g, '').replace(/^0/, '')}`;
+---
+
+<footer class="mt-16 w-full">
+  <!-- Gradient accent line above footer -->
+  <div class="accent-line w-full"></div>
+
+  <div id="asj-footer" class="footer-gradient border-t border-line/30">
+    <div class="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-16">
+      <!-- Four-column grid: Brand | Links | Social | Contact -->
+      <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+        <!-- Col 1: Brand -->
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-3">
+            {/* LOCAL LOGO — the last external image in the footer.
+                This `<img>` used to hotlink
+                `…supabase.co/storage/v1/object/public/asj-files/assets/logo-removebg-preview.webp`,
+                which was the one thing still contradicting this file's header
+                comment ("zero external images"). It now points at the repo's own
+                emblem, the same file `src/pages/404.astro` already renders.
+
+                WHY `/icons/logo-asj.webp` AND NOT A NEW FILE. It is a 500x500
+                WebP WITH an alpha channel, so it drops onto the footer gradient
+                with no white box — `public/assets/logo-asj-mark.webp` and
+                `logo-asj-laurel.webp` are the same emblem but ship a white
+                background (measured corner pixel 255,255,255). Reusing the
+                icon-dir file means no new asset and one logo path for both the
+                footer and the 404 page.
+
+                `onError="this.style.display='none'"` is gone with the remote
+                URL: it existed so a failed CDN fetch would not show a broken
+                icon, and silently hiding the brand mark is the wrong behaviour
+                for a file that ships with the build. `verify-assets.mjs` now
+                scans this file (`DIRECT_REF_SOURCES`) and fails if the logo
+                404s, which is a loud check instead of a hidden one. */}
+            <img
+              src="/icons/logo-asj.webp"
+              alt="Logo ASJ"
+              class="w-10 h-10 object-contain"
+              loading="lazy"
+            />
+            <h2 class="text-lg font-black text-fg tracking-wide" data-lang="footer.title">PT Amanah Sakura Japan</h2>
+          </div>
+          <div class="text-sm font-bold tracking-[4px] text-accent mt-1" data-lang="footer.tagline">夢を日本へ</div>
+          <p class="text-caption text-fg-muted mt-2 max-w-[28ch]" data-lang="footer.blurb">
+            Lembaga pelatihan & penempatan kerja resmi ke Jepang.
+          </p>
+        </div>
+
+        <!-- Col 2: Quick Links -->
+        <div class="flex flex-col gap-3">
+          <h3 class="text-caption uppercase font-bold text-fg-subtle tracking-wider" data-lang="footer.nav_heading">Navigasi</h3>
+          <nav class="flex flex-col" aria-label="Footer navigation">
+            {/*
+              Each link carries `min-h-11` (44px) -- the project's documented
+              touch floor (DESIGN.md:582, :691 "Target sentuh | >=44 px").
+
+              MEASURED 2026-09-22 at a 390px viewport, before this change: every
+              link rendered 343x23 and the list used `gap-2` (8px), so the
+              effective vertical rhythm was 31px -- well under the floor, and
+              these are the four primary navigation targets a thumb has to hit.
+
+              WHY PADDING ON THE ANCHOR AND NOT A BIGGER GAP. WCAG 2.5.5 measures
+              the TARGET, and a gap is not part of the target: `gap-4` would have
+              spaced them visually while leaving each link a 23px-tall hit box
+              with dead space around it. Padding puts the 44px on the element
+              that actually receives the tap. `gap-2` is therefore removed and
+              `items-start` keeps each link as wide as its text instead of
+              stretching to the column width, so the hover underline and the
+              pointer cursor do not extend across empty space.
+            */}
+            <a href="#program" class="min-h-11 inline-flex items-center text-body-sm text-fg-muted hover:text-fg transition-colors" data-lang="footer.nav_program">Program</a>
+            <a href="#alur" class="min-h-11 inline-flex items-center text-body-sm text-fg-muted hover:text-fg transition-colors" data-lang="footer.nav_alur">Alur Pendaftaran</a>
+            <a href="#fasilitas" class="min-h-11 inline-flex items-center text-body-sm text-fg-muted hover:text-fg transition-colors" data-lang="footer.nav_fasilitas">Fasilitas</a>
+            <a href="#tentang" class="min-h-11 inline-flex items-center text-body-sm text-fg-muted hover:text-fg transition-colors" data-lang="footer.nav_tentang">Tentang Kami</a>
+          </nav>
+        </div>
+
+        <!-- Col 3: Social -->
+        <div class="flex flex-col gap-3">
+          <h3 class="text-caption uppercase font-bold text-fg-subtle tracking-wider" data-lang="footer.social_heading">Sosial Media</h3>
+          <div class="flex flex-wrap gap-3">
+            <a id="footer-wa" href={`https://wa.me/${CONTACT_WHATSAPP}`} target="_blank" aria-label="WhatsApp" class="w-11 h-11 flex items-center justify-center bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-card border border-emerald-600/30 hover:border-emerald-500 transition">
+              <Icon name="whatsapp" class="text-lg" />
+            </a>
+            <a id="footer-ig" href={`https://instagram.com/${CONTACT_INSTAGRAM}`} target="_blank" aria-label="Instagram" class="w-11 h-11 flex items-center justify-center bg-pink-600/20 hover:bg-gradient-to-tr hover:from-yellow-500 hover:via-pink-500 hover:to-purple-600 text-pink-400 hover:text-white rounded-card border border-pink-600/30 hover:border-pink-500 transition">
+              <Icon name="instagram" class="text-lg" />
+            </a>
+            <a id="footer-tk" href="https://tiktok.com/@amahsakurajp" target="_blank" aria-label="TikTok" class="w-11 h-11 flex items-center justify-center bg-white/5 hover:bg-white/20 text-fg-muted hover:text-white rounded-card border border-white/10 hover:border-white/30 transition">
+              <Icon name="tiktok" class="text-lg" />
+            </a>
+            <a id="footer-gps" href={CONTACT_MAPS_URL} target="_blank" aria-label="Google Maps" class="w-11 h-11 flex items-center justify-center bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded-card border border-red-600/30 hover:border-red-500 transition">
+              <Icon name="map-marker-alt" class="text-lg" />
+            </a>
+          </div>
+        </div>
+
+        <!-- Col 4: Contact -->
+        <div class="flex flex-col gap-3">
+          <h3 class="text-caption uppercase font-bold text-fg-subtle tracking-wider" data-lang="footer.contact_heading">Kontak</h3>
+          {/*
+            Same 44px floor as the nav column above (DESIGN.md:582, :691).
+            MEASURED 2026-09-22 at 390px: the three tap links (two phones, one
+            mailto) rendered 343x23 each. The address stays a plain <span> --
+            it is not interactive, so it must NOT grow, which is why the floor is
+            applied per-anchor rather than to the column. `gap-1` then keeps the
+            visual rhythm close to the previous `gap-2` now that the links carry
+            their own padding.
+            ⚠ CORRECTED 2026-09-30: the measurement above was of THREE links.
+            The owner retired the second phone, so there are now TWO (one
+            tel, one mailto). The 44px floor and the per-anchor placement are
+            unchanged -- only the count in the sentence was stale, and it is
+            fixed rather than deleted because the measurement is the reason the
+            floor is applied this way.
+          */}
+          <div class="flex flex-col gap-1 text-body-sm text-fg-muted">
+            <span class="py-1" data-lang={CONTACT_ADDRESS.key}>{CONTACT_ADDRESS.text}</span>
+            <!-- ONE phone line, owner's order 2026-09-30 ("lainnya matikan").
+                 The second <a> is deleted rather than kept-but-unrendered: a
+                 retired number left in the markup still ships in the HTML and
+                 would read as live to anyone grepping the page. -->
+            <a id="footer-tel" href={TEL_HREF(CONTACT_PHONES[0])} class="min-h-11 inline-flex items-center hover:text-fg transition-colors">
+              <Icon name="phone" class="mr-1.5 text-accent-sky" />{CONTACT_PHONES[0]}
+            </a>
+            <a href={`mailto:${CONTACT_EMAIL}`} class="min-h-11 inline-flex items-center hover:text-fg transition-colors">
+              <Icon name="envelope" class="mr-1.5 text-accent-sky" />{CONTACT_EMAIL}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom bar -->
+      <div class="mt-12 pt-6 border-t border-line/30 text-center">
+        <div class="text-caption font-semibold tracking-[2px] text-fg-subtle" data-lang="footer.copyright">
+          © 2026 PT AMANAH SAKURA JAPAN. ALL RIGHTS RESERVED.
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>

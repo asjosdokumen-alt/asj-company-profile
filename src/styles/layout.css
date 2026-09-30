@@ -1,0 +1,540 @@
+/* ============================================================
+   ASJ Portal — Layout Primitives
+   ============================================================
+
+   WHY THIS FILE EXISTS
+   --------------------
+   Layout was being assembled ad-hoc from utilities, which produced
+   three recurring bugs across the 130 components:
+
+   1. FLEX/GRID OVERFLOW — `flex-1` and grid children default to
+      `min-width: auto`, so a long unbroken string (a candidate's WA
+      number, a job code) pushes the layout wider than the viewport
+      instead of truncating.
+   2. BREAKPOINT SPRAWL — `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`
+      repeated 32 times. `.u-grid-auto` replaces all of them with one
+      intrinsic rule that needs *zero* breakpoints.
+   3. SCROLL CONTAINERS — 50 `overflow-*-auto` elements, each
+      rediscovering that scroll chaining leaks to the page behind modals.
+
+   PREFIX CONVENTION
+   -----------------
+   `u-` = unlayered utility. These sit above Tailwind in the cascade so
+   a primitive always wins over a stray utility (e.g. `.u-scroll-area`
+   beats a leftover `overflow-hidden`). They use names Tailwind does not
+   generate, so there is no collision.
+
+   ⚠ CURATION RULE — READ BEFORE ADDING ANYTHING HERE
+   ---------------------------------------------------
+   Plain CSS in this file is NOT tree-shaken: every rule ships to every
+   page whether or not it is used. Tailwind utilities, by contrast, are
+   emitted on demand.
+
+   So this file holds ONLY primitives that are (a) actually used and
+   (b) not expressible as a stock Tailwind utility. An earlier draft
+   carried 32 classes; 20 were unused AND duplicated something Tailwind
+   already ships — `.u-truncate` vs `truncate`, `.u-clamp-2` vs
+   `line-clamp-2`, `.u-flex-center` vs `flex items-center justify-center`,
+   `.t-ui` vs `transition-colors` (which already includes fill/stroke),
+   `.t-move` vs `transition-transform`, `.t-fade` vs `transition-opacity`,
+   `.t-none` vs `transition-none`, `.u-no-shrink` vs `shrink-0`,
+   `.u-sticky-top` vs `sticky top-0`. Those were removed rather than
+   left as a speculative toolkit — duplicated API surface is a
+   maintenance cost, and dead rules are a per-page byte cost.
+
+   Safe-area spacing lives in ONE place: `.pb-safe` in global.css.
+   ============================================================ */
+
+
+/* ── 1. Intrinsic responsive grid ───────────────────────────────────
+   PERF + MAINTAINABILITY:
+   One rule replaces `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`.
+   `auto-fit` recomputes column count from available width, so it is
+   correct at *every* width — including the tablet-landscape,
+   wide-phone and split-screen widths no media query was written for.
+   It also responds to the CONTAINER, not the viewport, so a grid
+   inside a modal or sidebar lays out correctly instead of inheriting
+   a column count chosen for the full page.
+
+   The `min(..., 100%)` is the important bit: a bare
+   `minmax(18rem, 1fr)` overflows the viewport whenever the container
+   is narrower than 18rem (320px phones, and any grid nested inside a
+   sidebar). Clamping the minimum to 100% makes it impossible to
+   overflow, which deletes a whole class of horizontal-scroll bugs
+   caused by layout rather than by content.
+
+   NO `gap` HERE ON PURPOSE. This rule is unlayered, so setting `gap`
+   would silently beat every `gap-3` / `gap-5` utility on the element.
+   Pair the class with a `gap-*` utility instead — that keeps spacing
+   in the hands of whoever is authoring the markup.                  */
+.u-grid-auto {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(var(--u-grid-min, 18rem), 100%), 1fr)
+  );
+  /* Children default to `min-width: auto`, which lets a long word push
+     a column wider than its track. Zeroing it keeps tracks honest. */
+  min-width: 0;
+}
+.u-grid-auto > * { min-width: 0; }
+
+/* Variants are named for the JOB, not for a size, so a reader can tell
+   which one to reach for. All are breakpoint-free; `--u-grid-min` can
+   also be set inline for a one-off.                                 */
+.u-grid-auto--dense  { --u-grid-min: 12rem; }  /* chips, icon rows    */
+.u-grid-auto--cards  { --u-grid-min: 15rem; }  /* 3-up card grid      */
+.u-grid-auto--panels { --u-grid-min: 20rem; }  /* 2→3 up dashboards   */
+.u-grid-auto--form   { --u-grid-min: 24rem; }  /* 2-up form fields    */
+.u-grid-auto--wide   { --u-grid-min: 32rem; }  /* 2-up, roomy         */
+
+
+/* ── 2. Scroll area ─────────────────────────────────────────────────
+   Replaces the bare `overflow-y-auto` used in 37 places.
+
+   - `overscroll-behavior: contain` stops scroll CHAINING: reaching the
+     end of a modal's list no longer scrolls the page behind it. This
+     was previously applied by a global
+     `[class*="fixed inset-0"]` substring selector (see global.css);
+     putting it here means it costs one class match instead of an
+     attribute scan over every element in the document.
+   - `scrollbar-gutter: stable` reserves the scrollbar track up front,
+     so a list that grows from 3 to 50 rows does not reflow its own
+     content by ~15px. Kills a visible layout shift on Windows/Linux
+     (classic scrollbars). On macOS/iOS overlay scrollbars it is 0px.
+   - `min-height: 0` makes this behave as a flex child.
+   - `-webkit-overflow-scrolling: touch` keeps momentum scrolling on
+     older iOS; it is a no-op elsewhere.                             */
+.u-scroll-area {
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Horizontal variant: tables on phones. `scrollbar-gutter` is omitted
+   here on purpose — reserving a vertical gutter under a horizontally
+   scrolling table adds dead space without preventing any shift.      */
+.u-scroll-x {
+  overflow-x: auto;
+  min-width: 0;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+
+/* ── 3. Modal / overlay shell ───────────────────────────────────────
+   Applied to the 33 `fixed inset-0` backdrops. Carries only
+   `overscroll-behavior` — see motion.css §5 for the backdrop-filter
+   cost note.                                                         */
+.u-modal-shell {
+  overscroll-behavior: contain;
+}
+
+
+/* ─── 3b. Full-viewport edges for `fixed` overlays ───────────────────
+   THE PROBLEM (measured 2026-09-14)
+   ---------------------------------
+   `html { scrollbar-gutter: stable }` (global.css) reserves the
+   scrollbar track up front so opening a modal does not shift the page
+   ~15px on Windows/Linux. That reservation is correct and must stay.
+
+   But a `position: fixed` element resolves `right: 0` against the
+   INITIAL CONTAINING BLOCK, and the ICB EXCLUDES the reserved gutter.
+   So the drawer — and the backdrop meant to cover the whole screen —
+   stop 15px short of the physical viewport edge:
+
+     measured, 1280x800, gutter stable:
+       innerWidth 1280 | html width 1265 | nav.right 1265 | gap 15
+     with the gutter forced to `auto` (diagnostic only, NOT the fix):
+       innerWidth 1280 | html width 1280 | nav.right 1280 | gap 0
+
+   On phones this does not appear (390px viewport, gap 0 — overlay
+   scrollbars), which is exactly why the round-2 note only saw the
+   desktop case and blamed the symptom on the gutter "displacing" the
+   drawer.
+
+   NOT fixed by removing the gutter: `scrollbar-gutter` is what stops
+   the page jumping when a modal toggles `overflow: hidden`. Trading a
+   15px gap for a 15px layout shift is not a fix. The overlay is what
+   is wrong — it should meet the physical edge regardless of how the
+   page reserves scroll space.
+
+   The unit is required: `100vw` includes the scrollbar and would
+   overshoot to 1295px. `100dvw`/`100svw` track the dynamic viewport
+   and, unlike `vw`, are not inflated by the scrollbar. `svw` is used
+   as the fallback for older engines that do not know `dvw`.          */
+.u-viewport-fixed {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: 0;
+  width: 100svw;
+  height: 100dvh;
+}
+/* Edge-anchored variant for panels that keep their OWN width (the drawer
+   is `w-72 md:w-96`).
+
+   MEASURED BUGS I ALMOST SHIPPED — three, all caught by measuring:
+     1. Inheriting `width: 100svw` competed with `w-72`; both are
+        specificity 0,1,0, so source order decided the winner.
+     2. `width: auto` did NOT shrink-wrap. With `right: 0` and
+        `left: auto` the box is over-constrained and stretched to the
+        full containing block — measured `navWidth: 1265px` at 1280 and
+        `390px` at 390, i.e. a full-screen panel.
+     3. `inset-inline-end: 0` alone STILL lands 15px short on desktop.
+        Measured: `left: 881px` + `width: 384px` = right edge 1265,
+        while `innerWidth` is 1280. `position: fixed` resolves `right`
+        against the initial containing block, and the ICB is narrowed by
+        the classic scrollbar that `scrollbar-gutter: stable` reserves.
+
+   WHY THE FIX LOOKS LIKE THIS: three earlier attempts all tried to move
+   the drawer and failed, and a bare-probe experiment settled it. With
+   no app CSS at all, these were measured at innerWidth 1280:
+
+     position: fixed; right: 0                -> right 1265  gap 15
+     position: fixed; right: -15px            -> right 1280  gap 0
+     position: fixed; right: calc(0px - 15px) -> right 1280  gap 0
+     position: fixed; right: 0; transform: translateX(15px)
+                                              -> right 1280  gap 0
+
+   So the END edge is measured from an ICB that stops 15px short, and
+   the only thing that crosses it is a NEGATIVE `right` — no amount of
+   `margin`, `width`, or `left` arithmetic does it, because those are
+   all resolved inside the same shortened box.
+
+   `--u-scrollbar-gutter` is measured by the boot script in
+   BaseLayout.astro, because CSS cannot query the platform's scrollbar
+   style. When it is 0px — the value on macOS/iOS/Android overlay
+   scrollbars — the offset is `-0px`, i.e. plain `right: 0`, so the
+   behaviour there is byte-identical to before.                       */
+.u-viewport-fixed--right {
+  position: fixed;
+  top: 0;
+  bottom: auto;
+  left: auto;
+  right: calc(-1 * var(--u-scrollbar-gutter, 0px));
+  height: 100dvh;
+}
+
+
+/* ── 4. Long-list rendering budget ──────────────────────────────────
+   `content-visibility: auto` lets the browser skip LAYOUT AND PAINT
+   for off-screen items entirely. It also stops any animations inside
+   the skipped subtree, which makes it the cheapest way to park
+   decorative motion that has scrolled out of view.
+
+   `contain-intrinsic-size` supplies a placeholder height so the
+   scrollbar does not jump as items are realised. The `auto` keyword
+   makes the browser remember the real height after first paint, so the
+   placeholder only matters before that.
+
+   TUNE IT: `--u-cv-h` should approximate the real item height. Too
+   small and the scrollbar under-reports and jumps as content is
+   realised; too large and the list ends in dead space.
+
+   MEASURED DEFECT (2026-09-17) — cards inside a scroll container were
+   BLANK. The application-history card declared `--u-cv-h: 160px` but
+   really renders at 283px, and `content-visibility: auto` never
+   realised it: `e2e/measure-riwayat-card.mjs` reported
+   `innerTextLen: 0` — the card painted nothing at all, not even
+   clipped text. Two compounding causes:
+
+     1. the placeholder height was 123px short, so the card was judged
+        off-screen inside the `max-h-[300px]` scroll area; and
+     2. `content-visibility: auto` skips paint for anything the browser
+        believes is outside the viewport — inside an inner scroller the
+        intersection is evaluated against the wrong box, so the content
+        could stay unrealised while the user was looking straight at it.
+
+   RULE: only put `.u-cv-auto` on items in the PAGE-level scroll flow,
+   where the browser's intersection test is meaningful. Items inside a
+   nested scroll container (`.u-scroll-area`) must NOT use it — they are
+   already bounded by that container, so skipping them saves nothing and
+   costs correctness. The `--card` variant is therefore disabled below.
+
+   SAFETY — do NOT put this on <tr> or on display:table children:
+   skipping layout on a table row breaks column alignment, because each
+   column's width is derived from the widest cell across ALL rows and
+   unrendered rows report no width. This is why the 159-row job table
+   (LokerTable) and the admin tables do not use it. Apply it only to
+   repeating *card* / block containers.                               */
+.u-cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--u-cv-h, 88px);
+}
+/* Application-history cards live INSIDE `.u-scroll-area` (max-h-[300px]).
+   `content-visibility: auto` there made them paint nothing at all — measured
+   `innerTextLen: 0`, card blank. The container already bounds how much is
+   rendered, so skipping is worthless here; correctness wins.
+   Kept as a named class so the call site in CandidateDash.tsx stays readable,
+   and so re-enabling it is a one-line change if the layout ever moves these
+   cards into the page-level scroll flow. */
+.u-cv-auto--card { content-visibility: visible; }
+
+
+/* ── 4b. Bottom-nav clearance ───────────────────────────────────────
+   BottomNav renders `md:hidden fixed bottom-0` at 45px tall with
+   z-index 90, so on mobile it floats OVER the page. Any page content
+   that lands in the final 45px is unreachable: the user can scroll to
+   the end and still not tap the last control.
+
+   MEASURED DEFECT (2026-09-17) on /candidate at 390x844 —
+   `e2e/measure-bottomnav-clearance.mjs` reported:
+     navHeight        45px   (position: fixed, z-index 90)
+     mainPaddingBottom 0px
+     lastClickable    "Keluar"
+     overlapPx        16     → blocked: true
+   The logged-out candidate scrolled to the bottom saw the last
+   interactive element 16px underneath the bar.
+
+   `--u-nav-h` is the SINGLE source of truth for the bar's height. It
+   must track the `h-11` (44px) + 1px border in BottomNav.tsx — the
+   measured box is 45px, so use 45px, not 44px. If the bar's height
+   changes, change it here once and every page follows.
+
+   Apply to the scrolling page's last block (`<main>`), not to the
+   BottomNav. Use `pb-safe` too when the page should also clear the
+   iOS home indicator; these compose (padding is additive).          */
+:root { --u-nav-h: 45px; }
+
+/* ── `--u-toolbar-h` — the fixed FormToolbar's height ────────────────────
+   MEASURED 2026-09-25 with Playwright: `FormToolbar` renders **61px** tall
+   (`px-3 py-2` + a `min-h-11` control) at both 390 and 1280, in both themes.
+
+   WHY IT NEEDS A TOKEN. The toolbar is `fixed top-0 … z-[100]` and the admin
+   sidebar (`AdminPanel.tsx`) was `fixed top-0 h-full … z 96`. Two fixed
+   elements anchored at top-0, the toolbar above: measured overlap **15616 px²**
+   (256 × 61) on `/admin` at 1280 — the sidebar's own header row, which ends at
+   45px, sat ENTIRELY behind the toolbar, so its "MENU" label and its close
+   button were invisible and unclickable on desktop. The same happened at 390
+   whenever the sidebar was opened, for the same reason.
+
+   The fix is to start the sidebar below the bar rather than to reorder the
+   z-scale: the toolbar is meant to be on top. If the toolbar's height changes,
+   change it here once.                                                    */
+:root { --u-toolbar-h: 61px; }
+
+@media (max-width: 767.98px) {
+  .u-has-bottomnav {
+    padding-bottom: calc(var(--u-nav-h) + env(safe-area-inset-bottom, 0px));
+  }
+}
+/* Above md: the bar is `md:hidden`, so no clearance is needed and any
+   reserved space would be a visible gap. */
+@media (min-width: 768px) {
+  .u-has-bottomnav { padding-bottom: 0; }
+}
+
+
+/* ── 5. Print ──────────────────────────────────────────────────────
+   Rirekisho/CV printing goes through window.print(). Scroll
+   containment is meaningless on paper and `content-visibility` can
+   make off-screen content print blank — so both are disabled.       */
+@media print {
+  .u-scroll-area,
+  .u-scroll-x {
+    overflow: visible !important;
+  }
+  .u-cv-auto {
+    content-visibility: visible !important;
+  }
+}
+
+
+/* ── 6. Responsive table: cards below `md`, real table above ────────
+   WHY THIS EXISTS
+   ---------------
+   `LokerTable.tsx` has *always* carried `rt-row` / `rt-full` on its
+   rows and cells, and sets `data-label` on every `<td>` — but neither
+   class was ever defined anywhere. Measured 2026-09-14 (Playwright,
+   390x844): `rt-full` matched ZERO CSSOM rules, the cell computed to
+   `display: table-cell`, and `data-label` was read by nothing. So a
+   mobile card layout was intended and never written down.
+
+   That mattered, because the alternative — the raw 5-column table at
+   a phone width — measured badly (same run, 10 real rows):
+
+     table min-width      700px, inside a 358px wrapper  (49% visible)
+     rows above the fold  2 of 10
+     Detail               28 x 28 px
+     Format               28 x 24 px
+     Lamar Sekarang       29 x 30 px
+     all three            offScreenRight: true  <- need a horizontal
+                          scroll before they can be tapped at all
+
+   So on a phone the only high-value action ("Lamar Sekarang") needed a
+   horizontal scroll AND hit a 29px target. This section gives the
+   markup that already exists its actual behaviour.
+
+   HOW IT WORKS
+   ------------
+   Under `md` each row becomes a card and each `rt-full` cell becomes a
+   labelled block: the `data-label` the component already writes is
+   surfaced via `::before`, so no JS and no markup change is needed.
+   Cells that are NOT `rt-full` stay in a two-column mini-grid at the
+   card head (code + status), which reads as a header rather than a
+   form field.
+
+   Above `md` nothing here applies — the media query is the boundary,
+   so the desktop table is byte-for-byte the table it was before.     */
+@media (max-width: 767px) {
+  /* The wrapper stops being a scroll container: there is nothing to
+     scroll once the layout is a card. Leaving `overflow-x: auto` here
+     would keep a scrollbar gutter around a column that no longer
+     overflows. */
+  .u-scroll-x:has(.rt-row) {
+    overflow-x: visible;
+  }
+
+  table:has(.rt-row) {
+    min-width: 0;
+    display: block;
+  }
+  table:has(.rt-row) thead {
+    /* Column headers are meaningless once each cell carries its own
+       label via ::before — and keeping them would double every label. */
+    display: none;
+  }
+  table:has(.rt-row) tbody,
+  table:has(.rt-row) td {
+    display: block;
+    width: auto !important;
+  }
+  /* The row is a flex container, NOT `display: block`. `inline-block` only
+     puts two boxes on one line when they are adjacent inline-level siblings,
+     and the job-name cell — a `display: block` `.rt-full` — sits BETWEEN the
+     code cell and the status cell in the DOM. Under `display: block` those
+     two therefore land on separate lines (measured 120px apart), even though
+     the comment below claims they share the identity line. As flex items they
+     pair up, which is what was always intended. */
+  table:has(.rt-row) tr {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: 0.75rem;
+  }
+
+  /* Identity line: KODE JOB + STATUS share the first line, so the card is
+     identifiable before the long fields. `order: 1` lifts both above the
+     `.rt-full` cells without touching the DOM. The only cells whose visual
+     order changes are these two static text cells, so no focusable content
+     moves relative to DOM order — WCAG 2.4.3 concerns focus order, and the
+     buttons stay last in both. */
+  table:has(.rt-row) td:not(.rt-full) {
+    order: 1;
+    flex: 0 0 auto;
+    width: auto !important;
+    padding: 0.125rem 0.75rem 0.25rem 0 !important;
+    text-align: left !important;
+  }
+  /* NOTE: `td:not(.rt-full) + td:not(.rt-full)` used to carry the gap between
+     the two identity cells. It could never match — the job-name cell separates
+     them in the DOM, so no two non-.rt-full cells are ever adjacent siblings.
+     The gap is the right padding on the cell above. */
+
+  /* Full-width fields: a line of their own, label then value. */
+  table:has(.rt-row) td.rt-full {
+    order: 2;
+    flex: 1 0 100%;
+    padding: 0.5rem 0 0.25rem 0 !important;
+    max-width: none !important;
+  }
+  table:has(.rt-row) td.rt-full::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-fg-subtle);
+  }
+
+  /* Action row: full-width targets, comfortably above the 44px
+     guideline, instead of three 28px stamps at the far right of a
+     700px canvas. */
+  table:has(.rt-row) td.rt-full:last-child > div {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: stretch !important;
+    gap: 0.5rem !important;
+  }
+  table:has(.rt-row) td.rt-full:last-child > div > * {
+    flex: 1 1 auto;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem !important;
+  }
+  /* The component hides the button text below `sm` and shows only the
+     icon; with a full-width target there is room for the word, and a
+     labelled button is more readable than a bare glyph. */
+  table:has(.rt-row) td.rt-full:last-child > div > * > span {
+    display: inline !important;
+  }
+}
+
+
+/* ── 7. Sticky first column for the wide table (md and up) ──────────
+   Companion to §6. Above `md` the table is still 700px wide and still
+   scrolls horizontally inside `.u-scroll-x`, so scrolling to the
+   action column slides the job name out of view — the measured
+   complaint in §11.2. Pinning the name column keeps the row
+   identifiable while the user reaches for its actions.
+
+   `left: 0` on the code column, and the name column offset by the code
+   column's own width (`w-24` = 6rem) so the two stay aligned as the
+   table scrolls. `nth-child` is used rather than `nth-of-type`: every
+   child here is a `<td>` so the two agree, and `nth-child` states the
+   positional intent directly.
+   The background must be opaque or the scrolling columns show through. */
+@media (min-width: 768px) {
+  table:has(.rt-row) thead th:nth-child(1),
+  table:has(.rt-row) tbody td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+  }
+  table:has(.rt-row) thead th:nth-child(2),
+  table:has(.rt-row) tbody td:nth-child(2) {
+    position: sticky;
+    left: 6rem;               /* width of the KODE JOB column: w-24 */
+    z-index: 2;
+  }
+  /* Opaque backgrounds — required for sticky to be legible, otherwise
+     the scrolling columns read through the pinned ones. */
+  table:has(.rt-row) thead th:nth-child(1),
+  table:has(.rt-row) thead th:nth-child(2) {
+    background-color: var(--color-surface-raised);
+  }
+  table:has(.rt-row) tbody td:nth-child(1),
+  table:has(.rt-row) tbody td:nth-child(2) {
+    background-color: var(--color-surface);
+  }
+  /* The row's own hover tint (hover:bg-white/5) would be hidden behind
+     the opaque pinned cells, so the pinned cells reproduce it. Without
+     this the pinned column looks frozen while the rest of the row
+     responds to the pointer. */
+  table:has(.rt-row) tbody tr:hover td:nth-child(1),
+  table:has(.rt-row) tbody tr:hover td:nth-child(2) {
+    background-image: linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05));
+  }
+  /* Light mode: the same white tint is invisible on a white surface, so
+     the row highlight is a dark wash there instead. Keyed off the theme
+     attribute rather than a media query because the app's theme is a
+     user setting, not an OS preference. */
+  [data-theme="light"] table:has(.rt-row) tbody tr:hover td:nth-child(1),
+  [data-theme="light"] table:has(.rt-row) tbody tr:hover td:nth-child(2) {
+    background-image: linear-gradient(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.04));
+  }
+}
+

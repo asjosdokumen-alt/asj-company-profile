@@ -1,0 +1,1133 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import App from '../components/App.tsx';
+import LayananSection from '../components/public/LayananSection.astro';
+import ClosingBand from '../components/public/ClosingBand.astro';
+import JapanTexture from '../components/public/JapanTexture.astro';
+import Section from '../components/public/Section.astro';
+import SectionTitle from '../components/public/SectionTitle.astro';
+import Card from '../components/public/Card.astro';
+import IconTileGrid from '../components/public/IconTileGrid.tsx';
+import PersonGrid from '../components/public/PersonGrid.tsx';
+import PartnerGrid from '../components/public/PartnerGrid.tsx';
+import ReviewGrid from '../components/public/ReviewGrid.tsx';
+import FaqList from '../components/public/FaqList.tsx';
+import HistoryTimeline from '../components/public/HistoryTimeline.tsx';
+import ContactForm from '../components/public/ContactForm.tsx';
+import GalleryGrid from '../components/public/GalleryGrid.tsx';
+import FactList from '../components/public/FactList.tsx';
+import StepList from '../components/public/StepList.tsx';
+import CheckList from '../components/public/CheckList.tsx';
+import Icon from '../components/ui/Icon';
+import {
+  ABOUT_PARAGRAPHS,
+  ABOUT_WELCOME,
+  CONTACT_ADDRESS,
+  CONTACT_EMAIL,
+  CONTACT_HOURS,
+  CONTACT_HOURS_NOTE,
+  CONTACT_INSTAGRAM,
+  CONTACT_LOCATION,
+  CONTACT_MAPS_URL,
+  CONTACT_PHONES,
+  CONTACT_TIKTOK,
+  CONTACT_WHATSAPP,
+  FACILITIES,
+  FLOW_STEPS,
+  HISTORY,
+  LEGAL_FACTS,
+  MISSIONS,
+  PLACEMENTS,
+  PROGRAMS,
+  PROGRAM_INCLUDES,
+  PROGRAM_PAYMENT,
+  PROGRAM_PRICE,
+  REQUIREMENTS,
+  REQUIREMENT_DOCS,
+  TEAM,
+  VISION,
+  WHY_JAPAN,
+  WHY_JAPAN_TIP,
+} from '../lib/companyProfile';
+import { PARTNERS } from '../lib/partners';
+import { REVIEWS, REVIEW_SOURCE } from '../lib/testimonials';
+import { FAQ } from '../lib/faq';
+import { GALLERY } from '../lib/gallery';
+
+/* WHY THE SECTIONS ARE COMPOSED HERE AND NOT EACH IN THEIR OWN FILE.
+   Six of the blocks below are the same three elements — a Section, a SectionTitle
+   and one primitive — with different data. A file per composition would add six
+   files that contain no logic and no encapsulation, and each one would move the
+   indexer's frozen inventory for no gain. The primitives ARE the reusable part and
+   they are separate files; what is left here is page composition, which is what a
+   page file is for.
+
+   WHY THERE IS NO `.map()` IN THIS FILE. Iterating inside an `.astro` TEMPLATE
+   breaks a hard invariant of this repo: `indexer/src/build.test.ts:428` requires
+   zero unresolved references originating outside a test file, and the indexer
+   resolves template interpolations against the FRONTMATTER MODULE SCOPE only — so a
+   `.map()` callback parameter in a template is reported as an unresolved global
+   (measured: 21 entries, every one a callback parameter). Every list on this page
+   therefore lives in a `.tsx` primitive, where callbacks bind correctly. That is why
+   CheckList exists at all: four of these blocks were inline maps before it did. */
+---
+
+<BaseLayout title="PT Amanah Sakura Japan — Job Portal" titleKey="doc.title_home" description="Lowongan kerja Jepang, penerimaan siswa baru, pengurusan visa, pendaftaran ujian JFT & SSW" showFooter={true}>
+  <!-- `hero` turns the header band into the landing page's hero. It also moves
+       the page's single h1 into the hero, so the company name in the header
+       steps down to a div — see the note in App.tsx. Every OTHER route mounts
+       the header without this flag and keeps the header h1, because for those
+       routes it is the only one.
+
+       WHY `client:load` AND NOT `client:only="preact"` — measured 2026-09-23.
+       `client:only` renders NO server HTML, so with JavaScript unavailable this
+       page had **0 h1** and no header at all: the hero headline and the entire
+       nav existed only after hydration. On a landing page that is the one
+       heading a search engine and a no-JS reader need.
+
+       `client:load` server-renders the island and then hydrates it. Measured in
+       a real browser against a real server (390px, `server.cjs`):
+         · JS ON  — 1 h1, 13 header/nav links, 0 console errors, 0 page errors
+         · JS OFF — 1 h1 ("Karier ke Jepang, dimulai dari sini."), 13 links
+       Before the change the JS-OFF column read 0 h1 and 0 links.
+
+       THE HYDRATION MISMATCH THIS COULD HAVE CAUSED, AND WHY IT DOES NOT.
+       `langStore` is a `persistentAtom`, so a visitor with `asj_lang = "jp"`
+       stored would render Japanese on the client against the server's default
+       Indonesian. That is why the language is read through the store rather than
+       inlined into the markup: the text is IDENTICAL in both renders for any
+       visitor who has not switched, and for one who has, Preact patches the
+       text on hydration. The measurement above is the check — 0 page errors on
+       the default path, which is the path almost every visitor takes.
+
+       The gated routes (admin/candidate/apply/ai-cv/share/siswa-baru) keep
+       `client:only`: they are session-dependent SPAs that cannot function
+       without JavaScript, so server-rendering them would add weight and expose
+       gate markup for no reader's benefit. -->
+  <App client:load hero />
+
+  <!-- THE BAND THAT USED TO SIT HERE IS GONE, AND ITS THREE PARTS WENT TOGETHER.
+       Owner ruling 2026-09-25, verbatim: "ini kok masih ada bukannya saya suruh
+       hapus kemarin", with the count strip AND the section bar circled in the
+       screenshot, and then "Hapus marquee juga" for the announcement strip.
+
+       What was removed, in document order:
+         1. `#global-announcement` — the rose marquee, ON THIS PAGE ONLY. The
+            same band still exists on `/public` (`public.astro:25`), so the
+            `marquee-*` rules in `motion.css` and `e2e/measure-marquee.mjs`
+            stay valid and must NOT be deleted with it.
+         2. the live-vacancy count strip (`#live-job-count`) — the only consumer
+            of the `profile.hero_jobs_*` "lowongan aktif" key and of the
+            `getPublicData()` call on this page. ⚠ THE KEY IS DELETED FROM BOTH
+            DICTIONARIES, so do not spell it here: `i18n.keys.test.ts` scans
+            source files for key-like strings and counts a key named in a
+            COMMENT as "used", which is why writing it out made that gate red
+            with "missing from the id dictionary" after the key was gone. Name
+            the prefix, never the key.
+         3. the SiteNav component — the desktop section bar (`sticky top-0
+            z-sticky`). The component file is deleted, not merely unmounted;
+            leaving an unused `.astro` behind would keep four frozen indexer
+            counters and one e2e gate describing a bar no page renders.
+       The `<script>` block that fed 1 and 2 is gone with them, so `index.astro`
+       no longer imports `../lib/publicData` at all.
+
+       ⚠ THIS COMMENT MUST NOT SPELL THE DELETED TAG. The indexer parses `.astro`
+       COMMENTS as if they were markup, so writing the removed component's tag
+       here re-creates the exact unresolved `template-component` reference the
+       deletion was supposed to remove — measured 2026-09-25: the first draft of
+       this comment did that and took `graph.unresolved` from 2 to 3 and the
+       row-8 Renders-edge assertion from 0 to 1. Name the file, never the tag.
+       (`Section.astro` carries the same warning for capitalised tag names.)
+
+       ⚠ THE LINK TO `/loker` MOVED — IT WAS NOT DROPPED. That bar's "Lowongan"
+       item was the ONLY `href="/loker"` in the entire site (measured
+       2026-09-25: every other hit in `src/**` is prose; `Footer.astro` links only
+       four fragments). Deleting the bar would have left `/` with ZERO paths to
+       the vacancy list, and `e2e/test-landing.mjs`'s `LOKER_ROUTE` rule asserts
+       that path exists. The single link now lives in the drawer
+       (`App.tsx`, the always-visible block) because the owner's answer was
+       "lahkan ada dari menu hamburger" — the drawer is the one navigation every
+       visitor has, logged in or not. `LOKER_ROUTE` follows it there.
+
+       DO NOT RESTORE THE BAR. The hero is the page's opening statement and the
+       next thing a visitor sees should be `#kenapa-jepang`. -->
+
+  <!-- The mascot rail stood here — a sticky grid column beside <main> that
+       carried the princess down the page. Owner ruling 2026-09-24 removed her
+       from the site entirely, so the rail, its grid column and the sticky
+       `position` it needed are gone. <main> is a plain full-width block again;
+       no empty track is reserved beside it. Do not restore the rail — the
+       component, her renders and the scroll-tracking script were deleted with
+       it. -->
+  <!-- `overflow-x-clip` IS LOAD-BEARING — measured 2026-09-23, do not remove it.
+
+       The two HORIZONTAL entrance kinds (`enter="slide-left"` / `"slide-right"`
+       on #kenapa-jepang, #layanan, #fasilitas, #penempatan) park an un-revealed
+       band at `translate3d(±2 × --enter-shift, 0, 0)` — 48px at the current
+       `--enter-shift: 24px` (motion.css §9b). A band is FULL WIDTH, so while it
+       is un-revealed it sticks 48px past the viewport and widens the document:
+
+         measured at 390px on `/` — html.scrollWidth 423 vs clientWidth 390,
+         i.e. **33px of horizontal scroll** (48px shift minus the 15px scrollbar).
+         The offenders were `#layanan` and `#penempatan`, both 375px wide with
+         `transform: matrix(1,0,0,1,48,0)`. After the reveal the same page
+         measures scrollWidth 375 — the overflow exists ONLY pre-reveal.
+
+       Two consequences, which is why this is a fix and not a nitpick:
+         · A visitor can scroll the landing page sideways by 33px before the
+           reveal runs. The bands below the fold never enter at load, so this is
+           the state the page is in for everyone.
+         · `e2e/test-headings.mjs` asserts "no horizontal overflow" and was RED
+           on this, which made `e2e/test-headings.mutations.sh` and
+           `test-headings-public.mutations.sh` ABORT on their baseline check —
+           a red gate disarmed both proofs. That is the defect behind the defect.
+
+       `clip` and not `hidden`: this distinction used to be load-bearing because
+       `overflow: hidden` on one axis creates a scroll container, which would
+       have broken the mascot rail's `position: sticky`. The rail is gone (owner
+       ruling 2026-09-24), so either would work today — but `clip` is kept
+       because it is still the accurate tool: it clips the transient pre-reveal
+       offset without creating a scroll container, and nothing overflows
+       horizontally once the bands are revealed (measured: 375 = 375). Visually
+       the bands slide in from the edge instead of pushing the whole page
+       sideways, which is what the motion was for. -->
+  <main id="main-content" class="w-full max-w-[100rem] mx-auto pb-16 min-h-[50vh] overflow-x-clip">
+    <!-- Section: Kenapa Jepang? (page 2 of the company profile) -->
+    <Section id="kenapa-jepang" labelledBy="kenapa-jepang-title" enter="slide-left">
+      <SectionTitle
+        titleKey="profile.why_title"
+        title="Kenapa Jepang?"
+        descKey="profile.why_desc"
+        desc="Tiga alasan yang paling sering disebut kandidat."
+        accent="jobs"
+        headingId="kenapa-jepang-title"
+      />
+      <div class="mt-8">
+        <IconTileGrid tiles={WHY_JAPAN} />
+      </div>
+      <p data-lang="profile.why_tip" class="mt-6 max-w-[70ch] text-body-sm text-fg-muted">
+        {WHY_JAPAN_TIP.text}
+      </p>
+    </Section>
+
+    <!-- Section: Layanan — now a direct section instead of a hidden tab panel.
+         The tab system (Loker vs Layanan) was removed because the LokerTable
+         moved to its own page (/loker). This makes Layanan visible by default,
+         which is better for SEO and for visitors who scroll the profile. -->
+    <Section id="layanan" labelledBy="layanan-title" class="section-alt" enter="slide-right">
+      <SectionTitle
+        titleKey="profile.layanan_title"
+        title="Program & Layanan ASJ"
+        accent="program"
+        headingId="layanan-title"
+      />
+      <div class="mt-8">
+        <LayananSection />
+      </div>
+    </Section>
+
+    <!-- Section: Program ASJ (pages 3 and 4). The price and its four inclusions
+         ship together on purpose: a price without its inclusions is what makes a
+         candidate assume there are hidden costs. -->
+    <Section id="program" labelledBy="program-title" enter="grow">
+      <SectionTitle
+        titleKey="profile.prog_title"
+        title="Program ASJ"
+        descKey="profile.prog_desc"
+        desc="Dua jalur resmi ke Jepang, plus pelatihan bahasanya."
+        accent="program"
+        headingId="program-title"
+      />
+      <div class="mt-8">
+        <IconTileGrid tiles={PROGRAMS} />
+      </div>
+      <div class="mt-6 grid gap-4 md:grid-cols-2 md:gap-6">
+        <Card class="flex flex-col gap-2">
+          <span data-lang="profile.prog_price_label" class="text-caption uppercase font-bold text-accent-emerald">
+            Biaya program
+          </span>
+          <span data-lang={PROGRAM_PRICE.key} class="text-section font-black text-fg">{PROGRAM_PRICE.text}</span>
+          <span data-lang="profile.prog_payment" class="text-body-sm text-fg-muted">
+            {PROGRAM_PAYMENT.text}
+          </span>
+        </Card>
+        <Card class="flex flex-col gap-3">
+          <span data-lang="profile.prog_includes_title" class="text-caption uppercase font-bold text-accent-emerald">
+            Sudah termasuk
+          </span>
+          <CheckList items={PROGRAM_INCLUDES} accent="program" />
+        </Card>
+      </div>
+    </Section>
+
+    <!-- Section: Alur & Persyaratan (pages 3 and 4) -->
+    <Section id="alur" labelledBy="alur-title" class="section-alt border border-line/30 rounded-panel" enter="curtain">
+      <SectionTitle
+        titleKey="profile.step_title"
+        title="Bagaimana Prosesnya?"
+        descKey="profile.step_desc"
+        desc="Enam langkah dari pendaftaran sampai berangkat."
+        accent="exam"
+        headingId="alur-title"
+      />
+      <div class="mt-8">
+        <StepList steps={FLOW_STEPS} />
+      </div>
+
+      <div class="mt-12">
+        <h3 data-lang="profile.req_title" class="text-card-title font-bold text-fg">
+          Persyaratan &amp; Dokumen
+        </h3>
+        <p data-lang="profile.req_desc" class="mt-1 text-body-sm text-fg-muted">
+          Pastikan semuanya siap sebelum mendaftar.
+        </p>
+      </div>
+      <div class="mt-5 grid gap-6 lg:grid-cols-2">
+        <CheckList items={REQUIREMENTS} accent="exam" />
+        <div>
+          <h4 data-lang="profile.req_docs_title" class="text-caption uppercase font-bold text-accent-amber mb-3">
+            Berkas yang disiapkan
+          </h4>
+          <CheckList items={REQUIREMENT_DOCS} icon="file-alt" accent="exam" />
+        </div>
+      </div>
+    </Section>
+
+    <!-- Section: Visi & Misi (pages 2 and 5). Editorial, not bento: a vision is one
+         long sentence and a mission is four short points, so they are not two
+         comparable cards and giving them equal heights would inflate one of them. -->
+    <Section id="visi-misi" labelledBy="visi-misi-title" enter="drop">
+      <SectionTitle
+        titleKey="profile.vision_title"
+        title="Visi & Misi"
+        accent="identity"
+        headingId="visi-misi-title"
+      />
+      <div class="mt-8 grid gap-4 lg:grid-cols-2 lg:gap-6">
+        <Card radius="panel" padding="lg">
+          <h3 data-lang="profile.vision_heading" class="text-card-title font-bold text-accent">
+            Visi
+          </h3>
+          <p data-lang="profile.vision_body" class="mt-3 text-body-sm text-fg-muted">
+            {VISION.text}
+          </p>
+        </Card>
+        <Card radius="panel" padding="lg">
+          <h3 data-lang="profile.mission_heading" class="text-card-title font-bold text-accent">
+            Misi
+          </h3>
+          <div class="mt-3">
+            <CheckList items={MISSIONS} as="ol" accent="identity" />
+          </div>
+        </Card>
+      </div>
+    </Section>
+
+    <!-- Section: Legalitas (pages 6 and 7). A list, not a grid: a licence register
+         has hierarchy and nothing to compare. Every value is a literal — a
+         registration number is not translated. -->
+    <Section id="legalitas" labelledBy="legalitas-title" class="section-alt border border-line/30 rounded-panel" enter="focus">
+      <SectionTitle
+        titleKey="profile.legal_title"
+        title="Legalitas & Izin Resmi"
+        descKey="profile.legal_desc"
+        desc="Badan hukum dan nomor pendaftaran yang bisa diperiksa."
+        accent="legal"
+        headingId="legalitas-title"
+      />
+      <div class="mt-8">
+        <FactList facts={LEGAL_FACTS} accent="legal" />
+      </div>
+    </Section>
+
+    <!-- Section: Fasilitas (pages 11-15 plus the price inclusions on page 3) -->
+    <Section id="fasilitas" labelledBy="fasilitas-title" enter="slide-left">
+      <SectionTitle
+        titleKey="profile.fac_title"
+        title="Fasilitas & Dukungan"
+        descKey="profile.fac_desc"
+        desc="Yang kandidat dapatkan selama pelatihan."
+        accent="program"
+        headingId="fasilitas-title"
+      />
+      <div class="mt-8">
+        <IconTileGrid tiles={FACILITIES} />
+      </div>
+    </Section>
+
+    <!-- Section: Galeri Kegiatan (R3).
+         WHY IT SITS DIRECTLY AFTER #fasilitas. The tile grid above makes claims
+         ("Kelas Bahasa Jepang", "Ruang Kantor", "Ruang Tamu") and this section is
+         the evidence for them — a claim followed immediately by the photograph of
+         the thing it claims. Separation would weaken both.
+
+         WHY ONLY NINE OF THE TWENTY-SIX AVAILABLE PHOTOGRAPHS. Four are excluded
+         on purpose and the reasons are recorded in src/lib/gallery.ts rather than
+         here, so the next person finds them before "completing" the grid: two are
+         scans carrying a third party's signature and NIP, one is a CCTV frame with
+         a burned-in timestamp and a surveillance angle, and one is a recruitment
+         flyer whose price is baked into pixels. `gallery.test.ts` fails if any of
+         them is re-added, and it also fails on a `src` that is not on disk — which
+         is the exact hole the note at #tentang below used to describe.
+
+         NO LIGHTBOX — see the note in GalleryGrid.tsx: one dialog contract. -->
+    <Section id="galeri" labelledBy="galeri-title" class="section-alt border border-line/30 rounded-panel" enter="grow">
+      <SectionTitle
+        titleKey="profile.gallery_title"
+        title="Galeri Kegiatan"
+        descKey="profile.gallery_desc"
+        desc="Suasana pelatihan, kantor, dan keberangkatan peserta."
+        accent="identity"
+        headingId="galeri-title"
+      />
+      <div class="mt-8">
+        <GalleryGrid items={GALLERY} />
+      </div>
+    </Section>
+
+    <!-- Section: Penempatan Kami (R4, pages 13 and 14).
+         WHY THIS REPLACES TESTIMONIALS. The mockup put quotes in this slot; the
+         company profile contains none. It does contain something more useful —
+         four prefectures with dated interview banners behind them — so the slot
+         shows provable evidence instead of invented praise.
+
+         The list comes from PLACEMENTS, and the UI does not restate the
+         prefecture NAMES anywhere: it renders the `value` columns as written, so
+         adding a fifth placement is a one-line edit to companyProfile.ts and there
+         is no second copy of the list to forget. (The hero's count is derived from
+         the same module via PLACEMENT_PREFECTURES.) -->
+    <!-- Section: Lowongan Ringkas (R2) WAS HERE and is deliberately gone.
+         Owner ruling 2026-09-24: `/` is a company profile for MoU/business
+         partners, not a job board, so a vacancy teaser does not belong on it.
+         The vacancy list is still reachable from the section nav; the page
+         keeps exactly ONE link to it. Do not restore this section — the
+         supporting data (`profile.mini_*` keys, `JobMiniList.tsx`) was removed
+         with it. -->
+
+    <Section id="penempatan" labelledBy="penempatan-title" class="section-alt border border-line/30 rounded-panel" enter="slide-right">
+      <SectionTitle
+        titleKey="profile.place_title"
+        title="Penempatan Kami"
+        descKey="profile.place_desc"
+        desc="Bidang dan prefektur tujuan yang tercatat pada dokumen perusahaan."
+        accent="identity"
+        headingId="penempatan-title"
+      />
+      {/* Placement scenery band — the section had only a FactList and no image.
+          It copies the `#lokasi` banner's shape exactly (picture + avif/webp
+          sources + a 1x/2x srcset), for the same reason: the ratio is reserved
+          before load so the section does not jump, and the rounding lives on the
+          wrapper so the corners clip the image.
+
+          DECORATIVE, so `alt=""` + `aria-hidden`. The section already names the
+          four prefectures in its FactList and states what it is in its h2; the
+          band carries no information those two do not, which is the same test
+          the `#lokasi` note applies to its own skyline.
+
+          ARTWORK REPLACED 2026-09-28. This slot used to hold a photograph of Mt
+          Fuji across a lake, chosen because it was exactly 3:2 and contained no
+          people. The owner supplied a generated map of Japan instead and asked
+          for it here, so both of those properties moved, and neither move is
+          cosmetic:
+
+            - the ratio is now 4:3, the source's own shape. It is read from the
+              file rather than kept at 3:2, because a 3:2 box over a 4:3 picture
+              makes `object-cover` discard a quarter of the map's height — and
+              on a map the missing band is Kyushu or Hokkaido;
+            - it is an ILLUSTRATION, not a photograph, so it sits in the asset
+              gate's ILLUSTRATIONS set for the stronger of that set's two
+              reasons: there is no subject who could consent or refuse, so
+              §11.2's consent requirement has nothing to attach to.
+
+          The declared 1200x900 is the real size of the 1x file. */}
+      <picture class="u-drift-frame block mt-6 aspect-[4/3] overflow-clip rounded-panel border border-line/30">
+        <source
+          type="image/avif"
+          srcset="/assets/ilustrasi/penempatan-banner.avif 1x, /assets/ilustrasi/penempatan-banner@2x.avif 2x"
+        />
+        <source
+          type="image/webp"
+          srcset="/assets/ilustrasi/penempatan-banner.webp 1x, /assets/ilustrasi/penempatan-banner@2x.webp 2x"
+        />
+        <img
+          src="/assets/ilustrasi/penempatan-banner.webp"
+          alt=""
+          aria-hidden="true"
+          width="1200"
+          height="900"
+          loading="lazy"
+          decoding="async"
+          class="u-drift"
+        />
+      </picture>
+      <div class="mt-8">
+        <FactList facts={PLACEMENTS} accent="identity" />
+      </div>
+      <p data-lang="profile.place_note" class="mt-6 max-w-[70ch] text-body-sm text-fg-muted">
+        Nama prefektur ditulis dalam huruf Latin, sesuai dokumen resmi.
+      </p>
+    </Section>
+
+    <!-- Section: Tentang Kami (S7, page 2).
+         3 paragraphs of prose, and research places long text blocks as the case
+         where a bento grid loses — forcing a paragraph into a card cuts a
+         sequential argument into pieces that cannot be read in order.
+
+         THE IMAGE GAP IS NOW CLOSED, and the note that used to sit here is kept
+         in shortened form because its reasoning was right and its premise expired:
+         it said the spec called for `fasilitas-gedung.webp` while `public/` held
+         only icons and the logo, and that rendering an <img> at a path that does
+         not exist would show a broken image, so the gap was recorded rather than
+         filled with a placeholder. That was the correct call. The asset now exists
+         (`public/assets/fasilitas-gedung.webp`, 1600x1066) along with 25 others, so
+         the block ships with the photograph — and `gallery.test.ts` now fails on a
+         `src` that is not on disk, so the failure mode that note was protecting
+         against cannot come back silently.
+
+         WHY THE PHOTO SITS BESIDE THE PROSE, NOT ABOVE IT. Three paragraphs of
+         sequential argument should not be interrupted, and a full-width image
+         would push the last paragraph below the fold on a laptop. The text column
+         is capped at 68ch, which is the measure the paragraphs were already set
+         to; the photo takes the remaining third. -->
+    <Section id="tentang" labelledBy="tentang-title" enter="curtain">
+      <SectionTitle
+        titleKey="profile.about_title"
+        title="Tentang Kami"
+        descKey="profile.about_desc"
+        desc="Lembaga pelatihan dan penempatan kerja di Ponorogo."
+        accent="identity"
+        headingId="tentang-title"
+      />
+      <div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,68ch)_1fr] lg:items-start">
+      <div class="flex flex-col gap-4">
+        <p data-lang="profile.about_welcome" class="text-body font-semibold text-fg border-l-2 border-accent pl-4">
+          {ABOUT_WELCOME.text}
+        </p>
+
+        <!-- The princess mascot stood here, beside the opening paragraph.
+             Owner ruling 2026-09-24: the mascot is removed from the site
+             entirely, so she and her `surface-raised` panel are gone. The
+             paragraphs below carry the section on their own — she added warmth,
+             not information, which is exactly why she could leave without a
+             replacement. Do not restore her: the component and her renders were
+             deleted with this block. -->
+        <p data-lang="profile.about_p1" class="text-body text-fg-muted">
+          {ABOUT_PARAGRAPHS[0].text}
+        </p>
+        <p data-lang="profile.about_p2" class="text-body text-fg-muted">
+          {ABOUT_PARAGRAPHS[1].text}
+        </p>
+
+        <!-- ── Status SO — stated plainly, and high up ────────────────────────
+             Owner ruling 2026-09-27: the page must not read as "ASJ sends
+             workers to Japan". ASJ is a small LPK WITHOUT SO (Sending
+             Organization) status, so it is not authorised to depart a worker
+             directly; the departure is executed by the MoU partner LPKs/PTs
+             (SOs). That fact is now in about_p2, but a paragraph is easy to
+             skim past — and this is the one claim a candidate or a prospective
+             partner most needs to read correctly.
+
+             WHY A <p> AND NOT A HEADING. `e2e/test-headings.mjs` asserts `/`
+             has exactly one h1 and ONE heading per visible section, so any
+             heading level here would make #tentang report two. The accent
+             border and the bold lead-in carry the emphasis instead, the same
+             device `about_welcome` above already uses.
+
+             The lead-in is translated too (`profile.about_so_note_label`), so
+             the Japanese page does not show two language systems in one band. -->
+        <p class="mt-2 rounded-card border border-accent/40 bg-accent/5 p-4 text-body-sm text-fg-muted border-l-4">
+          <strong data-lang="profile.about_so_note_label" class="block text-fg font-bold mb-1">
+            Status SO (Sending Organization)
+          </strong>
+          <span data-lang="profile.about_so_note">
+            Kami belum berstatus SO. Keberangkatan ke Jepang dijalankan bersama mitra LPK dan PT (SO) yang bekerja sama dengan kami melalui MoU.
+          </span>
+        </p>
+        <a
+          href="#program"
+          class="mt-2 inline-flex items-center gap-2 min-h-11 text-body-sm font-bold text-accent hover:underline"
+        >
+          <span data-lang="profile.about_cta">Tentang Program Kami</span>
+          <Icon name="arrow-right" />
+        </a>
+
+        <!-- Sejarah — the brief for "Tentang Kami" asks for visi, misi, SEJARAH and
+             tim, and the page had the other three but not this one: it said what
+             the company does and never when it was founded or on whose authority.
+             Three milestones, each carrying its own document reference so the entry
+             is checkable rather than merely plausible.
+
+             WHY A DEFINITION LIST RATHER THAN Card COMPONENTS. These are a sequence
+             in time, not three comparable alternatives — `docs/LANDING_PAGE_ROADMAP`
+             §L3 makes the same call for Visi & Misi, which are editorial rather than
+             bento for exactly this reason. A <dl> also keeps the heading level below
+             the section's h2, which the single-h1 rule on `/` requires.
+
+             WHY EVERY VALUE FAILS THE BANNED-FIGURE TEST IF TYPED WRONG. The mockup
+             claimed "Berdiri Sejak 2015", and companyProfile.test.ts bans 2015 from
+             every export. So these dates cannot regress to the mockup's number
+             without a red gate — the dates are guarded, not merely stated. -->
+        <div class="mt-6 border-t border-line pt-6">
+          <HistoryTimeline milestones={HISTORY} />
+        </div>
+      </div>
+        <figure class="flex flex-col">
+          <!-- THE DECLARATION NOW MATCHES THE FILE. This block used to call the
+               picture "Gedung kantor ... di Ponorogo" and give it
+               `alt="Gedung kantor PT Amanah Sakura Japan"`. The photograph is
+               not a building portrait — it is about twenty people in batik
+               standing in front of the office, which is the same subject
+               `fasilitas-grup-staf.webp` shows from a different angle. The
+               dimensions were right (1600x1066) and the file existed, so
+               `gallery.test.ts` and `verify:assets` both passed: neither gate
+               reads the picture. Corrected 2026-09-20 — see
+               docs/ASSET_AUDIT_2026-09-20.md.
+
+               WHY THE PHOTOGRAPH STAYS. A company profile that shows only
+               rooms and logos and never shows a person is the weaker page, and
+               `src/lib/gallery.ts` already argues this in prose: these are the
+               company's own staff and participants, photographing their own
+               office. What had to change was the claim, not the picture. -->
+          <img
+            src="/assets/fasilitas-gedung.webp"
+            alt="Peserta dan staf LPK Amanah Sakura Japan berfoto bersama di depan kantor, mengenakan seragam batik lembaga."
+            width="1000"
+            height="666"
+            loading="lazy"
+            decoding="async"
+            class="w-full rounded-card border border-line object-cover"
+          />
+          <figcaption data-lang="profile.about_caption" class="mt-3 text-caption text-fg-muted">
+            Peserta dan staf di kantor LPK Amanah Sakura Japan — Ponorogo, Jawa Timur
+          </figcaption>
+        </figure>
+      </div>
+    </Section>
+
+    <!-- Section: Tim & Kredensial (S10, pages 8 and 10). The credential card is
+         the point of this section: an N1 holder is a checkable fact, which is
+         stronger evidence than the word "professional" in prose. -->
+    <Section id="tim" labelledBy="tim-title" class="section-alt border border-line/30 rounded-panel" enter="focus">
+      <SectionTitle
+        titleKey="profile.team_title"
+        title="Tim & Kredensial"
+        descKey="profile.team_desc"
+        desc="Struktur organisasi dan kualifikasi pengajar kami."
+        accent="legal"
+        headingId="tim-title"
+      />
+      <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Card class="flex flex-col gap-1">
+          <span data-lang="profile.cred_title" class="text-caption uppercase font-bold text-accent">
+            Kredensial pengajar
+          </span>
+          <span class="text-section font-black text-fg">JLPT N1</span>
+          <span class="text-body-sm text-fg-muted">N1A225127J</span>
+        </Card>
+      </div>
+      <div class="mt-6">
+        <PersonGrid people={TEAM} />
+      </div>
+    </Section>
+
+    <!-- Section: Kontak (R1, pages 5, 8 and 9).
+
+         WHY THE SUBTITLE DOES NOT REFERENCE OFFICE HOURS. The hours are P-4 —
+         never supplied by the owner, with the fallback recorded as "baris jam
+         dihilangkan" in `LANDING_PAGE_SPEC.md:659`. The subtitle used to tell
+         visitors to get in touch during working hours, which is a schedule this
+         page never states, so it pointed them at something they had no way to
+         look up. It now names the three channels that do exist. When the owner
+         supplies the hours, add the ROW and a subtitle that can reference it —
+         do not restore the old sentence on its own.
+
+         This comment is deliberately written WITHOUT quoting the retired
+         sentence, because Astro ships HTML comments to the browser: a literal
+         copy of it here would keep a text search of the built page non-empty
+         and read as "the old copy is still on the page". -->
+
+    <!-- Section: Mitra Kami (sponsor-model partner slots).
+         OWNER'S REQUEST, 2026-09-27, verbatim:
+           "di paling bawah di kah di kasih mitra kami. kek model sponsor gitu.
+            ada usulaan baiknya gimna."
+         and the reason it is needed, in the owner's own words:
+           "kita ini perusahaan lpk kecil belum SO jadi gak bisa memberangkatkan
+            ke jepang secara langsung tapi kami mempunyai banyak rekan MoU lpk
+            dan pt so".
+
+         WHY IT SITS LAST, ABOVE CONTACT. The page's argument runs: who we are →
+         what we teach → where that leads → who we are (team) → here is the
+         network that actually departs you → talk to us. Placing the partners
+         immediately before the contact band means the reader who has just
+         learned "ASJ is not an SO" is answered before they leave the page, and
+         the contact section stays the single final action on the page.
+
+         WHY THE SLOTS WERE EMPTY, AND WHAT CHANGED — see src/lib/partners.ts.
+         The section shipped 2026-09-27 with six empty slots whose names the
+         owner would supply later; the owner supplied them 2026-09-29 and the
+         grid now shows six named partners. The empty branch is NOT dead — it is
+         the state a seventh, not-yet-named slot takes — and the grid still
+         renders the same explicit not-yet-filled copy for it.
+
+         Do NOT add a partner the owner has not named: an invented partner is a
+         false claim about a real company on the page built to earn partners'
+         trust. A name goes in only with the partner's own publication as the
+         basis (partners.ts records where each was read from).
+
+         WHY THIS SECTION HAS NO `enter` VALUE THAT COLLIDES WITH THE DRIFT.
+         It takes `enter="slide-left"` like its neighbours, so it enters and
+         drifts in one direction (motion.css §9f) — a band that entered from the
+         left and drifted right reads as fighting itself. -->
+    <Section id="mitra" labelledBy="mitra-title" enter="slide-left">
+      <SectionTitle
+        titleKey="profile.mitra_title"
+        title="Mitra Kami"
+        descKey="profile.mitra_desc"
+        desc="Keberangkatan ke Jepang dijalankan bersama mitra LPK dan PT (SO) berikut."
+        accent="legal"
+        headingId="mitra-title"
+      />
+      <!-- The sponsor-model note. It states the relationship in one sentence,
+           above the grid, so a reader who only skims the cards still learns
+           WHAT the cards are — a logo wall with no explanation is the shape
+           this section has to avoid, because it would read as "our clients"
+           rather than "the bodies that send our participants".
+
+           THE TRAILING CLAUSE THAT SAID THE LIST WAS STILL BEING PREPARED WAS
+           REMOVED 2026-09-29, when the owner supplied the six partner names. It
+           was true while the grid rendered six empty slots and became false the
+           moment they were filled — a page that lists six partners and
+           simultaneously says the list is still being prepared contradicts
+           itself in adjacent sentences. The note now states only the
+           relationship, which is permanent.
+
+           That retired clause is NOT quoted verbatim here, deliberately: Astro
+           ships HTML comments to the browser, so a literal copy would keep a
+           text search of the built page non-empty and read as "the old copy is
+           still on the page". State the change, not the string. -->
+      <p
+        data-lang="profile.mitra_note"
+        class="mt-6 max-w-[70ch] text-body-sm text-fg-muted"
+      >
+        Kami belum berstatus SO, sehingga keberangkatan peserta ke Jepang dilaksanakan oleh mitra LPK dan PT (SO) yang telah menandatangani MoU dengan kami.
+      </p>
+      <div class="mt-8">
+        <PartnerGrid partners={PARTNERS} />
+      </div>
+      <!-- The badge gloss — ADDED 2026-09-30, at the owner's ruling.
+           The owner spotted that the six MoU partners are mostly SO, not LPK,
+           and the corrected badges left two cards reading "LPK Japanesia" with
+           an "SO" badge beside it — a contradiction on its face. The fix keeps
+           the partner's own name (a name is theirs to state) and explains what
+           the badge ASSERTS: a departure-licence standing, not a legal-entity
+           type. Sits BELOW the grid because it annotates the badges above it. -->
+      <p
+        data-lang="profile.mitra_kind_gloss"
+        class="mt-4 max-w-[70ch] text-caption text-fg-muted"
+      >
+        Keterangan: badge di bawah nama adalah STATUS IZIN keberangkatan (SO = Sending Organization, berwenang memberangkatkan), bukan bentuk badan hukum. Nama mitra tetap memakai sebutan yang mereka pakai sendiri, sehingga ada mitra yang berbunyi "LPK" namun berizin SO.
+      </p>
+      <p
+        data-lang="profile.mitra_cta_desc"
+        class="mt-6 max-w-[70ch] text-body-sm text-fg-muted"
+      >
+        Ingin menjadi mitra penempatan (MoU) kami? Silakan hubungi kami melalui bagian Kontak di bawah.
+      </p>
+    </Section>
+
+    <!-- Section: Kata Alumni (testimonials) — ADDED 2026-09-29, OWNER'S REQUEST.
+         The owner asked for a review section, to be filled from the Google Maps
+         reviews of our own listing and upgraded later, in the same message as the
+         CSS-polish and map-link work. Verbatim: "kalau untuk review testimoni
+         nanti saya carikan sekarang buat kan model dasarnya saja. isi sementara
+         dengan isi review dari google maps".
+
+         WHY IT SITS BETWEEN MITRA AND KONTAK. The page's argument is: who we are
+         → what we teach → where that leads → who we are (team) → the network that
+         departs you → what that network's alumni say → talk to us. Social proof
+         belongs immediately after the partner grid, because it answers the
+         question the partner grid raises ("you are not an SO — who sends me, and
+         does it work?"). The contact section stays the single final action.
+
+         WHY THE GRID SHIPS EMPTY, AND WHY THAT IS NOT A BUG OR AN OVERSIGHT.
+         `COMPANY_PROFILE_DATA.md` §8 bans an invented testimonial: a quoted
+         sentence attributed to a named person who never said it is a fabricated
+         claim about a third party. The owner will supply real reviews; until
+         then every slot renders an explicit "review belum tayang" state. This is
+         the SAME pattern the Mitra grid used — built with empty slots on
+         2026-09-27, filled 2026-09-29 — so a reader who sees an empty grid here
+         sees the honest shape of the section, not filler. Do NOT paraphrase a
+         review to make the grid look finished.
+
+         THE ONE REAL NUMBER IS THE LISTING'S, NOT OURS. `REVIEW_SOURCE` carries
+         the Google rating (5.00) and review count (7), read from the live listing
+         on 2026-09-29. That is fine because it cites the platform's own public
+         figure rather than a claim we make up; §8's ban is on invented totals of
+         CANDIDATES / DEPARTURES / PARTNERS, not on citing a platform's own score.
+         The aggregate links to the live listing so a sceptical reader can check
+         it — a rating with no way to verify it is the shape to avoid. -->
+    <Section id="testimoni" labelledBy="testimoni-title" class="section-alt border border-line/30 rounded-panel" enter="rise">
+      <SectionTitle
+        titleKey="profile.review_title"
+        title="Kata Alumni"
+        descKey="profile.review_desc"
+        desc="Cerita peserta yang telah belajar dan berangkat bersama kami."
+        accent="exam"
+        headingId="testimoni-title"
+      />
+      <!-- The aggregate strip. Shows the listing's real rating and count, and
+           links out to the live listing. Renders even while the grid is empty:
+           the rating is about the LISTING, and the listing already has reviews —
+           hiding it until our own cards are filled would understate a fact that
+           is already public. -->
+      <div class="u-surface-depth mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-card border border-line/40 bg-surface px-5 py-4">
+        <span class="flex items-center gap-2">
+          <span class="flex gap-0.5 text-accent-amber text-card-title" aria-hidden="true">★★★★★</span>
+          <span class="text-card-title font-black text-fg">{REVIEW_SOURCE.rating.toFixed(1)}</span>
+        </span>
+        <span class="flex items-baseline gap-1 text-body-sm text-fg-muted">
+          <span data-lang="profile.review_count_from">dari</span>
+          <span class="font-bold text-fg">{REVIEW_SOURCE.count}</span>
+          <span data-lang="profile.review_count_of">ulasan di Google Maps</span>
+        </span>
+        <a
+          href={REVIEW_SOURCE.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="u-lift ml-auto min-h-11 inline-flex items-center gap-2 rounded-control border border-line/50 bg-surface-raised px-4 text-body-sm font-bold text-accent hover:text-fg transition-colors"
+          style="--u-lift-border:var(--color-accent-amber);--u-glow:color-mix(in oklab, var(--color-accent-amber) 45%, transparent)"
+        >
+          <Icon name="location-arrow" />
+          <span data-lang="profile.review_open_maps">Lihat di Google Maps</span>
+        </a>
+      </div>
+      <div class="mt-6">
+        <ReviewGrid reviews={REVIEWS} />
+      </div>
+      <p
+        data-lang="profile.review_cta_desc"
+        class="mt-6 max-w-[70ch] text-body-sm text-fg-muted"
+      >
+        Sudah pernah belajar atau berangkat bersama kami? Bagikan cerita Anda melalui kontak di bawah.
+      </p>
+    </Section>
+
+    <!-- Section: Pertanyaan Umum (FAQ) — ADDED 2026-09-29.
+         MEASURED that day: this page had no FAQ while JIPA publishes 6 Q&A and
+         the other partners answer cost/schedule questions inline. The five
+         questions are the ones that recur across all six partner sites.
+
+         WHY IT SITS HERE, BETWEEN TESTIMONI AND KONTAK. A reader who is not yet
+         persuaded by other people's experience is the one holding a question;
+         the answer sits directly above the way to ask another one. That order is
+         also why the CONTACT form follows rather than leads.
+
+         WHY THERE IS NO HEIGHT QUESTION. The printed profile contradicts itself
+         on the women's minimum (h.3 says 145 cm, h.4 says 150 cm) and the
+         decision is still open — COMPANY_PROFILE_DATA.md §12 K-3. It is a
+         selection criterion, so publishing either number would reject a
+         candidate who should have passed. The requirement answer names the
+         intake range and routes the rest to contact instead. Do not "complete" it.
+
+         Every answer is transcribed from docs/COMPANY_PROFILE_DATA.md; per-entry
+         sources are recorded in src/lib/faq.ts. -->
+    <Section id="faq" labelledBy="faq-title" class="section-alt border border-line/30 rounded-panel" enter="slide-right">
+      <SectionTitle
+        titleKey="profile.faq_title"
+        title="Pertanyaan Umum"
+        descKey="profile.faq_desc"
+        desc="Pertanyaan yang paling sering ditanyakan calon peserta, dijawab dari dokumen resmi lembaga."
+        accent="identity"
+        headingId="faq-title"
+      />
+      <div class="mt-6">
+        <FaqList items={FAQ} />
+      </div>
+    </Section>
+
+    <Section id="kontak" labelledBy="kontak-title" enter="drop">
+      <SectionTitle
+        titleKey="profile.contact_title"
+        title="Informasi Kontak"
+        descKey="profile.contact_desc"
+        desc="Silakan hubungi kami melalui telepon, surel, atau formulir."
+        accent="identity"
+        headingId="kontak-title"
+      />
+      <div class="mt-8 grid gap-4 md:grid-cols-2">
+        <Card class="flex flex-col gap-3">
+          <span data-lang="profile.contact_address" class="text-caption uppercase font-bold text-accent">
+            Alamat
+          </span>
+          <span class="text-body-sm text-fg-muted" data-lang={CONTACT_ADDRESS.key}>{CONTACT_ADDRESS.text}</span>
+        </Card>
+        <Card class="flex flex-col gap-3">
+          <span data-lang="profile.contact_phone" class="text-caption uppercase font-bold text-accent">
+            Telepon
+          </span>
+          <!-- ONE number, not two — owner's order 2026-09-30. The array is
+               length 1, so there is deliberately no [1] line here; a second
+               <span> would render an empty row the moment the tuple shrinks. -->
+          <span class="text-body-sm text-fg-muted">{CONTACT_PHONES[0]}</span>
+          <div class="flex flex-col gap-1 pt-2 border-t border-line">
+            <span data-lang="profile.contact_hours" class="text-caption uppercase font-bold text-accent">
+              Jam Operasional
+            </span>
+            <span class="text-body-sm text-fg-muted" data-lang={CONTACT_HOURS.key}>{CONTACT_HOURS.text}</span>
+            <span class="text-caption text-fg-muted" data-lang={CONTACT_HOURS_NOTE.key}>{CONTACT_HOURS_NOTE.text}</span>
+          </div>
+          <div class="flex flex-col gap-1 pt-2 border-t border-line">
+            <span data-lang="profile.contact_email" class="text-caption uppercase font-bold text-accent">
+              Surel
+            </span>
+            <a href={`mailto:${CONTACT_EMAIL}`} class="inline-flex items-center min-h-11 text-body-sm text-fg-muted hover:underline">
+              {CONTACT_EMAIL}
+            </a>
+          </div>
+        </Card>
+      </div>
+
+      {/* ── Kode QR kanal kontak ───────────────────────────────────────────
+           The owner asked for the three channel QR codes in the contact
+           section. They sit BELOW the address/phone cards and ABOVE the form:
+           a visitor who wants to reach the company on a phone can scan one, and
+           a visitor who wants to type a message still scrolls one step further.
+
+           WHY NO HEADING HERE. `e2e/test-headings.mjs` asserts `/` carries
+           exactly one h1 and one heading per visible section, so a heading of
+           any level for this row would make `#kontak` report two. The tile
+           labels are <span>s for that reason, and the row is announced through
+           each link's own accessible name instead.
+
+           WHY EACH TILE CARRIES `min-h-11` (44px). Same touch floor as the
+           footer nav links (DESIGN.md:582, :691 "Target sentuh | >= 44 px"): a
+           tap target must be 44px, and a gap is not part of the target.
+
+           WHY THE IMAGES ARE CONTENT, NOT DECORATION. A QR code is a
+           machine-readable instruction, so each carries a real `alt` describing
+           what scanning it does rather than `alt=""`. The links open in a new
+           tab and use `rel="noopener noreferrer"`, matching the footer's social
+           links. */}
+      <div class="mt-6 grid grid-cols-3 gap-3 sm:gap-4">
+        <a
+          href={`https://wa.me/${CONTACT_WHATSAPP}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-lang-aria="profile.qr_whatsapp_aria"
+          aria-label="Buka WhatsApp PT Amanah Sakura Japan"
+          class="min-h-11 flex flex-col items-center gap-2 rounded-card border border-line/40 bg-surface p-3 u-lift hover:bg-surface-raised" style="--u-lift-border:var(--color-accent)"
+        >
+          <picture class="block w-full rounded-md overflow-hidden">
+            <source
+              type="image/avif"
+              srcset="/assets/ilustrasi/qr-whatsapp.avif 1x, /assets/ilustrasi/qr-whatsapp@2x.avif 2x"
+            />
+            <source
+              type="image/webp"
+              srcset="/assets/ilustrasi/qr-whatsapp.webp 1x, /assets/ilustrasi/qr-whatsapp@2x.webp 2x"
+            />
+            <img
+              src="/assets/ilustrasi/qr-whatsapp.webp"
+              alt="Kode QR WhatsApp PT Amanah Sakura Japan — pindai untuk menghubungi kami."
+              width="256"
+              height="256"
+              loading="lazy"
+              decoding="async"
+              class="w-full aspect-square object-contain"
+            />
+          </picture>
+          <span data-lang="profile.qr_whatsapp" class="text-body-sm font-bold text-fg">WhatsApp</span>
+        </a>
+        <a
+          href={`https://instagram.com/${CONTACT_INSTAGRAM}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-lang-aria="profile.qr_instagram_aria"
+          aria-label="Buka Instagram PT Amanah Sakura Japan"
+          class="min-h-11 flex flex-col items-center gap-2 rounded-card border border-line/40 bg-surface p-3 u-lift hover:bg-surface-raised" style="--u-lift-border:var(--color-accent)"
+        >
+          <picture class="block w-full rounded-md overflow-hidden">
+            <source
+              type="image/avif"
+              srcset="/assets/ilustrasi/qr-instagram.avif 1x, /assets/ilustrasi/qr-instagram@2x.avif 2x"
+            />
+            <source
+              type="image/webp"
+              srcset="/assets/ilustrasi/qr-instagram.webp 1x, /assets/ilustrasi/qr-instagram@2x.webp 2x"
+            />
+            <img
+              src="/assets/ilustrasi/qr-instagram.webp"
+              alt="Kode QR Instagram PT Amanah Sakura Japan — pindai untuk melihat kegiatan kami."
+              width="256"
+              height="256"
+              loading="lazy"
+              decoding="async"
+              class="w-full aspect-square object-contain"
+            />
+          </picture>
+          <span data-lang="profile.qr_instagram" class="text-body-sm font-bold text-fg">Instagram</span>
+        </a>
+        <a
+          href={`https://tiktok.com/@${CONTACT_TIKTOK}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-lang-aria="profile.qr_tiktok_aria"
+          aria-label="Buka TikTok PT Amanah Sakura Japan"
+          class="min-h-11 flex flex-col items-center gap-2 rounded-card border border-line/40 bg-surface p-3 u-lift hover:bg-surface-raised" style="--u-lift-border:var(--color-accent)"
+        >
+          <picture class="block w-full rounded-md overflow-hidden">
+            <source
+              type="image/avif"
+              srcset="/assets/ilustrasi/qr-tiktok.avif 1x, /assets/ilustrasi/qr-tiktok@2x.avif 2x"
+            />
+            <source
+              type="image/webp"
+              srcset="/assets/ilustrasi/qr-tiktok.webp 1x, /assets/ilustrasi/qr-tiktok@2x.webp 2x"
+            />
+            <img
+              src="/assets/ilustrasi/qr-tiktok.webp"
+              alt="Kode QR TikTok PT Amanah Sakura Japan — pindai untuk menonton video kami."
+              width="256"
+              height="256"
+              loading="lazy"
+              decoding="async"
+              class="w-full aspect-square object-contain"
+            />
+          </picture>
+          <span data-lang="profile.qr_tiktok" class="text-body-sm font-bold text-fg">TikTok</span>
+        </a>
+      </div>
+
+      {/* ── Formulir kontak ────────────────────────────────────────────────
+           THE ONE INTERACTIVE ISLAND IN THIS SECTION, and the reason it is an
+           island at all: the submission is the only unauthenticated WRITE in
+           the deployment, so it needs client state (sending / sent / error) that
+           static HTML cannot express. Everything above it stays server-rendered.
+
+           `client:visible` rather than `client:load` on purpose. This section is
+           near the bottom of a long page, so shipping the component's JavaScript
+           on first paint would spend the landing page's main-thread budget on a
+           form most visitors scroll past — the exact cost the L-series work
+           measured (docs/LANDING_PAGE_ROADMAP.md, perf rows). It hydrates when
+           it scrolls into view, which is before anyone can type into it.
+
+           The heading is an <h3> UNDER the section's existing <h2>, not a second
+           <h2>: `e2e/test-headings.mjs` asserts `/` has exactly one <h1> and one
+           heading per visible section, and a peer heading here would make the
+           contact section report two. */}
+      <div class="u-surface-depth mt-8 rounded-panel border border-line/30 bg-surface p-5 sm:p-6">
+        <h3 class="text-card-title font-bold text-fg" data-lang="contact.title">
+          Kirim Pesan
+        </h3>
+        <p class="mt-1 mb-5 text-body-sm text-fg-muted" data-lang="contact.desc">
+          Sampaikan pertanyaan Anda melalui formulir di bawah ini.
+        </p>
+        <ContactForm client:visible />
+      </div>
+    </Section>
+
+    <!-- Section: Lokasi (R5, page 5). The map banner was MOVED here from
+         LayananSection.astro (spec §3, S5 row 2 and roadmap L3.8) — the page had
+         one map, in the wrong section, and duplicating it would mean two copies of
+         one address to keep in sync. What moved is the banner itself, address and
+         link together, so the "Buka Google Maps" button is the same element the
+         visitor could already reach inside the services panel. -->
+    <Section id="lokasi" labelledBy="lokasi-title" class="section-alt border border-line/30 rounded-panel" enter="rise">
+      <SectionTitle
+        titleKey="profile.loc_title"
+        title="Lokasi Kami"
+        descKey="profile.loc_desc"
+        desc="Kantor kami di Kabupaten Ponorogo, Jawa Timur."
+        accent="jobs"
+        headingId="lokasi-title"
+      />
+      {/* Location banner illustration. Decorative, so `alt=""` + aria-hidden:
+          the section already states the location in its h2 and its address, and
+          the drawing is a skyline band with no unique information in it.
+
+          `aspect-[2/1]` matches the file's 1200x600 exactly, so the ratio is
+          reserved before load and the section does not jump. Rounding is on the
+          wrapper (`rounded-panel overflow-hidden`) so the corners clip the
+          image, rather than relying on the image's own corners.
+
+          `loading="lazy"` here — unlike the hero, this band is far below the
+          fold and is never the LCP element. */}
+      <picture class="u-drift-frame block mt-6 aspect-[2/1] overflow-clip rounded-panel border border-line/30">
+        <source
+          type="image/avif"
+          srcset="/assets/ilustrasi/lokasi-banner.avif 1x, /assets/ilustrasi/lokasi-banner@2x.avif 2x"
+        />
+        <source
+          type="image/webp"
+          srcset="/assets/ilustrasi/lokasi-banner.webp 1x, /assets/ilustrasi/lokasi-banner@2x.webp 2x"
+        />
+        <img
+          src="/assets/ilustrasi/lokasi-banner.webp"
+          alt=""
+          aria-hidden="true"
+          width="1200"
+          height="600"
+          loading="lazy"
+          decoding="async"
+          class="u-drift"
+        />
+      </picture>
+      <div class="u-surface-depth mt-8 bg-surface-raised border border-line rounded-panel p-5 md:p-6 flex flex-col sm:flex-row justify-between items-center gap-5 text-center sm:text-left">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 bg-red-900/30 rounded-full flex items-center justify-center shrink-0">
+            <Icon name="map-marker-alt" class="text-red-500 text-xl" />
+          </div>
+          <div>
+            <p class="text-white font-bold text-body-sm mb-1" data-lang="landing.maps_title">
+              Kunjungi LPK Amanah Sakura Japan
+            </p>
+            <p class="text-body-sm text-fg-muted max-w-xl" data-lang={CONTACT_ADDRESS.key}>
+              {CONTACT_ADDRESS.text}
+            </p>
+          </div>
+        </div>
+        <a
+          id="maps-lpk-link"
+          href={CONTACT_MAPS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="u-lift inline-flex items-center gap-2 px-6 py-3 rounded-control bg-surface border border-line text-fg text-body-sm font-bold transition whitespace-nowrap"
+          style="--u-glow: var(--color-accent-sky);"
+        >
+          <Icon name="location-arrow" />
+          <span data-lang="profile.loc_open_maps">Buka di Google Maps</span>
+        </a>
+      </div>
+    </Section>
+  </main>
+
+  <!-- ─── Pita dekoratif Jepang (asanoha) ──────────────────────────────
+       The ONE landingside gamefeel element that needs no visitor state.
+
+       WHY THIS IS A BARE BAND AND NOT A LAYER INSIDE A Section. `Section`
+       renders `py-14 md:py-20` with no `relative`, so an absolutely-positioned
+       child would escape its box and paint over the section above it. A band
+       with its own `relative` + `overflow-hidden` is self-contained: it cannot
+       bleed, and it cannot cover content it does not own.
+
+       WHY IT CARRIES NO TEXT AND NO HEADING. `e2e/test-headings.mjs` asserts
+       `/` has EXACTLY ONE h1, and the L2 work already had to move that h1 into
+       the hero. A decorative band that also announced itself would be the
+       second heading on the page. `JapanTexture` renders none, and its suite
+       fails if that changes.
+
+       WHY NOTHING IS SCORED HERE. A visitor has no account, so any number on
+       this page would be invented — docs/ILLUSTRATION_SPEC.md §6.0 calls that
+       out as reading as surveillance rather than game. There are no numbers,
+       no levels and no badges in this band, deliberately. -->
+  <!-- Gradient accent divider — replaces the asanoha texture band.
+       The old JapanTexture band was purely decorative and loaded a complex SVG
+       pattern. The gradient accent line is simpler, theme-responsive (via
+       --accent-line in theme.css), and echoes the footer's top divider for
+       visual consistency. -->
+  <div class="max-w-7xl mx-auto px-4 my-8">
+    <div class="accent-line w-full rounded-full"></div>
+  </div>
+
+  <ClosingBand />
+</BaseLayout>

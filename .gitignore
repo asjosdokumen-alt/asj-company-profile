@@ -1,0 +1,76 @@
+node_modules/
+dist/
+.astro/
+.env
+.env.*
+*.log
+test-results/
+.DS_Store
+.netlify/
+deploy.zip
+.workbuddy-ai/
+.claude/
+skills-lock.json
+
+# ── Foto perusahaan yang memuat WAJAH ORANG — JANGAN di-commit ──────────────
+# Repo ini PUBLIK. Aturan §11.2 (`docs/COMPANY_PROFILE_DATA.md`) menetapkan bahwa
+# foto yang memuat wajah yang bisa dikenali — sebagian besar kandidat muda,
+# sebagian mungkin di bawah umur — TIDAK boleh masuk repo: publikasi lewat repo
+# tidak bisa ditarik kembali. Blok ini dibawa apa adanya dari repo portal
+# (`asj-astro`), tempat aturan itu lahir setelah 26 berkas foto duduk di
+# `public/assets/` dalam keadaan untracked TANPA satu pun pola ignore, sehingga
+# satu `git add -A` akan menerbitkannya secara permanen.
+#
+# KENAPA SATU PER BERKAS, BUKAN SATU POLA DIREKTORI. Ini sudah dibuktikan di repo
+# portal, bukan diasumsikan: git mendokumentasikan sendiri bahwa berkas tidak bisa
+# di-*re-include* bila DIREKTORI induknya sudah di-*exclude*, jadi `/public/assets/`
+# diikuti `!…` adalah jaminan palsu. Bentuk yang benar: setiap berkas berwajah
+# disebut SATU PER SATU. Konsekuensinya disengaja — berkas baru di `public/assets/`
+# TIDAK PERNAH otomatis ter-commit, dan menambahkannya harus keputusan sadar.
+#
+# `scripts/ci/verify-assets.mjs` memerahkan gate bila daftar ini tidak lagi
+# sinkron dengan galeri atau dengan isi folder. Jalankan `npm run verify:assets`.
+#
+# Wajah — poster mensetsu (6 wajah muda bernomor dada), foto grup, banner:
+/public/assets/galeri-mensetsu-okayama.webp
+/public/assets/galeri-mensetsu-pengolahan-makanan.webp
+/public/assets/galeri-mensetsu-pertanian-1.webp
+/public/assets/galeri-mensetsu-pertanian-2.webp
+/public/assets/galeri-mensetsu-peternakan.webp
+/public/assets/fasilitas-gedung-banner.webp
+/public/assets/fasilitas-grup-siswa-2.webp
+/public/assets/fasilitas-ruang-tamu-2.webp
+# CCTV: watermark merek + timestamp terbakar + sudut pengawasan
+/public/assets/fasilitas-kelas-bahasa-1.webp
+/public/assets/fasilitas-ruang-kantor-2.webp
+# Foto keberangkatan dengan wajah yang bisa dikenali
+/public/assets/galeri-keberangkatan-2.webp
+/public/assets/galeri-keberangkatan-3.webp
+/public/assets/galeri-keberangkatan-4.webp
+/public/assets/fasilitas-staf-2.webp
+# Pindaian dokumen pihak ketiga: tanda tangan, nama cetak, NIP, QR
+/public/assets/legal-ahu-0063921-2023.webp
+/public/assets/legal-akta-09-2023.webp
+/public/assets/legal-jlpt-n1-hadi-prasojo.webp
+# Flyer/poster dengan harga & teks marketing menyatu di piksel
+/public/assets/poster-rekrutmen.webp
+
+# Scratch measurement/report output. Evidence, regenerable, not source.
+.tmp-audit/
+.tmp-*
+coverage/
+
+# Secrets and scratch credential notes. Nothing here is ever source, and a token
+# that reaches git history is permanent.
+.env.local
+*-credentials.txt
+*-token*.txt
+netlify_auth_token*
+*_auth_token*
+*nfp_*
+*ghp_*
+*gho_*
+*ghu_*
+*ghs_*
+*ghr_*
+*github_pat_*

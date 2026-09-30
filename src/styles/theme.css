@@ -1,0 +1,469 @@
+/* ============================================================
+   ASJ Portal — Design Token Foundation (Tailwind CSS v4.3)
+   ============================================================
+
+   WHY THIS FILE EXISTS
+   --------------------
+   Light mode used to be implemented by overriding Tailwind's *literal*
+   utility classes with `!important` (~92 rules in global.css, e.g.
+   `html.light .bg-slate-900 { background-color: #fff !important }`).
+   That is unmaintainable: every new component needs new overrides, the
+   two themes fight on specificity, and you can never tell which rule wins.
+
+   This file replaces that with semantic tokens. `bg-surface` /
+   `text-fg` / `border-line` map to CSS variables that flip value when
+   `data-theme` flips. No !important, no specificity war.
+
+   MIGRATION IS INCREMENTAL
+   ------------------------
+   The slate palette is NOT removed, so `bg-slate-900` keeps working.
+   The legacy shim in global.css is keyed on those literal class names,
+   so the moment an element stops carrying `bg-slate-900`, the shim rule
+   stops matching it. Old and new can never both apply to one element.
+   Migrate file by file, in any order.
+
+   ------------------------------------------------------------------ */
+
+/* ── 1. Theme switch ────────────────────────────────────────────────
+   Tailwind v4.3 ships `dark` as `@media (prefers-color-scheme: dark)`,
+   so it MUST be re-declared to work off an attribute on <html>.
+
+   Verified against tailwindcss@4.3.3 dist/lib.mjs:
+     - `@custom-variant` CANNOT be nested inside another rule.
+     - It CANNOT have both a selector and a body (pick one).
+     - Parenthesised selector form is required; `&` is applied to the
+       element AND its subtree (hence the two comma-separated selectors).
+     - Avoid commas inside :not() — the param splitter is naive.        */
+@custom-variant dark  (&:where([data-theme="dark"],  [data-theme="dark"] *));
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
+
+/* ── 2. Semantic tokens ─────────────────────────────────────────────
+   `static` = always emit the CSS variable to :root even if no utility
+   references it yet (hand-written CSS and the legacy shim use var()).
+   It does NOT bloat the generated utility classes.                     */
+@theme static {
+  /* Surfaces — dark values are the historical defaults */
+  --color-canvas:          #020617;  /* page background, was bg-slate-950 */
+  --color-surface:         #0f172a;  /* panels/header,   was bg-slate-900 */
+  --color-surface-raised:  #1e293b;  /* modals/cards,    was bg-slate-800 */
+  --color-surface-sunken:  #000000;  /* inputs,          was bg-black     */
+
+  /* Foreground */
+  --color-fg:              #f1f5f9;  /* was text-white / text-slate-100   */
+  --color-fg-muted:        #94a3b8;  /* was text-slate-400                */
+  /* MEASURED 2026-09-19 (WCAG 2.1 relative luminance). The previous value
+     #64748b failed on both surfaces this token is actually used on:
+
+       #64748b on --color-surface        (#0f172a) = 3.75:1  fails AA text
+       #64748b on --color-surface-raised (#1e293b) = 3.07:1  fails even the
+                                                            3:1 UI floor
+
+     It is not decoration — it carries table column labels, job-card meta and
+     small print, i.e. text a visitor has to read.
+
+     #8595aa clears AA on BOTH: 5.85:1 on surface, 4.79:1 on raised. The
+     intermediate candidate #7c8ba1 (5.16 / 4.22) was rejected because it still
+     fails on raised, and a token that is only safe on some of its surfaces is
+     the same trap in a new colour. */
+  --color-fg-subtle:       #8595aa;
+
+  /* Borders */
+  --color-line:            #334155;  /* was border-slate-700/800          */
+  --color-line-strong:     #475569;
+
+  /* Accent roles — these carried the most per-theme !important overrides */
+  --color-accent:          #f9a8d4;  /* was text-pink-300    */
+  --color-accent-emerald:  #34d399;  /* was text-emerald-400 */
+  --color-accent-sky:      #38bdf8;  /* was text-sky-400     */
+  --color-accent-red:      #f87171;  /* was text-red-400     */
+  --color-accent-amber:    #fbbf24;
+  --color-accent-violet:   #a78bfa;
+
+  --color-brand:           #10b981;
+  --color-brand-fg:        #04211a;
+
+  /* z-index scale.
+     NOTE: the theme namespace is `--z-index`, NOT `--z`
+     (verified: themeKeys:["--z-index"] → generates utility `z-modal`).
+
+     `header` (90) and `loader` (9999) were added because components
+     hard-coded z-[90] / z-[9999]; use `z-header` / `z-loader` instead
+     so the stacking order is legible from one place.                   */
+  --z-index-sticky:  50;   /* sticky table headers, section bars        */
+  --z-index-header:  90;   /* was z-[90]                                */
+  /* Drawer/menu backdrop. A scrim must cover every page layer that is actually
+     POSITIONED, but stay UNDER the drawer it belongs to (100). Before this
+     token existed the drawer and its scrim carried a SECOND, private scale in
+     App.tsx (scrim 35, drawer 40), so a `z-sticky` section bar (50) painted
+     OVER the dimmed page — measured 2026-09-25.
+
+     ⚠ "THE HEADER (90)" WOULD BE WRONG, AND THIS COMMENT USED TO SAY IT. The
+     header element carries NO z-index (it computes to `auto`), and
+     `--z-index-header` is defined but applied by NOTHING in `src/` — verified
+     with `grep -rn z-header src/`, which finds only this file. The token exists
+     because components once hard-coded `z-[90]`. So the layers the scrim has to
+     clear are the ones that really exist: `z-sticky` (50) and any
+     `z-modal`/`z-popover` content beneath the drawer. Verified in a real
+     browser at 1280px with the drawer open: the scrim computes 95 and the
+     drawer 100, an `elementsFromPoint` sweep between them returns NOTHING, and
+     the header's topmost element at its centre IS the scrim.
+     One scale, no second copy. */
+  --z-index-scrim:   95;
+  --z-index-drawer:  100;
+  --z-index-modal:   200;
+  --z-index-popover: 300;
+  --z-index-toast:   400;
+  --z-index-loader:  9999; /* was z-[9999] — full-screen boot overlay    */
+
+  /* One self-hosted family. Overrides Tailwind's default --font-sans,
+     which also feeds preflight's html font-family. */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* ── The DISPLAY family — a second, single-purpose face ─────────────
+     Owner request 2026-09-27, from a reference short: a full-screen
+     illustrated hero with an oversized SERIF display headline. The repo
+     had one family (Inter) and no display tier, so the largest text on
+     the landing page was Inter at 900 — a UI grotesque doing a display
+     face's job.
+
+     WHY THIS FACE, AND WHY ONLY ONE WEIGHT.
+     Candidates measured on this toolchain, all `@fontsource`, all
+     self-hosted, latin subset, ONE weight (400) — the fewest that works:
+
+       · Instrument Serif  — 20.5 KB. Chosen. A display-only editorial
+         serif: very high stroke contrast, tight sidebearings, a large
+         x-height, and it is drawn for exactly one job (large sizes). It
+         reads as an editorial travel brand rather than as a default
+         serif, which is the register of the reference.
+       · DM Serif Display  — 24.2 KB. Also display-only and single-weight,
+         but heavier in the stems and more "fashion magazine" than the
+         delicate editorial line the reference has.
+       · Fraunces          — rejected on cost, not on looks: it ships as a
+         variable font (1.8 MB package) and a usable weight range would
+         cost an order of magnitude more bytes for a face used at one size.
+
+     Instrument Serif is 2.8 KB SMALLER than the Inter 900 face this repo
+     already measured and accepted (23.3 KB — see BaseLayout.astro:9-24),
+     and it is the ONLY weight the family has, so there is no second weight
+     to argue about. `font-black` on a serif with one weight would be
+     SYNTHETIC bold — a smeared fake — so any element that adopts this face
+     must also drop its weight utility; that is why the hero h1 carries
+     `font-normal` explicitly rather than inheriting.
+
+     SCOPE. This is a DISPLAY face, not a second body face: body copy,
+     section titles, cards, forms and tables all stay Inter. It is exposed
+     as a utility (`font-display`) so a future display-tier heading can
+     adopt it deliberately, and it is currently applied to exactly one
+     element — the landing hero `h1` (App.tsx, the `hero` branch). */
+  --font-display: "Instrument Serif", ui-serif, Georgia, "Times New Roman",
+    /* CJK FALLBACK IS DELIBERATE, NOT AN AFTERTHOUGHT. The JP dictionary
+       renders this same headline as `日本でのキャリアは、ここから始まる。`
+       (i18n-jp.ts:785) and Instrument Serif carries NO CJK glyphs. Listing
+       the three shipped Mincho faces first means Japanese falls back to a
+       JAPANESE SERIF — the same register, one script over — instead of
+       dropping to whatever the generic `serif` keyword happens to resolve
+       to. System faces only: this list adds zero bytes. */
+    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+
+  /* ── Radius scale ────────────────────────────────────────────────
+     MEASURED 2026-09-19, before this block existed: 39 arbitrary radius values
+     across 8 distinct sizes — `rounded-[2rem]` x25, `rounded-[14px]` x5,
+     `rounded-[20px]` x2, `rounded-[2.5rem]` x2, `rounded-[1.5rem]` x2,
+     `rounded-[28px]`, `rounded-[24px]`, `rounded-[1.3rem]`.
+
+     Arbitrary values cannot be ratcheted. There is no token to raise or lower,
+     and nothing in the markup says which corner is the official one — so every
+     new card picks a ninth value. Five named tokens replace all eight.
+
+     `--radius-*` is the Tailwind v4 namespace for border-radius, so these
+     generate `rounded-control` / `rounded-card` / `rounded-panel` /
+     `rounded-band` / `rounded-pill` alongside the stock sm/md/lg/xl scale.
+     The stock scale is left intact: removing it would break `rounded-full`,
+     `rounded-lg` and friends across 130 components for no measurable gain. */
+  --radius-control: 0.75rem;  /* buttons, inputs, chips            */
+  --radius-card:    1rem;     /* cards, bento tiles                */
+  --radius-panel:   1.5rem;   /* panels, large cards, the rail     */
+  --radius-band:    2rem;     /* hero, CTA band, footer            */
+  --radius-pill:    9999px;   /* status chips, tabs, round buttons */
+
+  /* ── Type scale ──────────────────────────────────────────────────
+     `--text-*` is the Tailwind v4 font-size namespace, and the
+     `--text-*--line-height` / `--letter-spacing` sub-keys ride along with it —
+     so `text-section` arrives with its own leading and tracking and a call site
+     cannot forget them. That is the point: the drift this replaces was not
+     "wrong sizes", it was six sections each pairing a size with a different
+     leading.
+
+     Sizes are `clamp()` where the element spans both breakpoints, so one value
+     is correct at 390 px and at 1536 px without a media query.
+
+     Weight is NOT set here. `--text-*--font-weight` would make every
+     `text-body` element bold-by-default and fight the `font-bold` utilities
+     already in the markup; weight stays a call-site decision. */
+  /* RETUNED 2026-09-27 for the full-screen hero. It was
+     `clamp(2rem, 5vw, 3.5rem)` (56 px ceiling) — a UI scale, sized for a
+     26rem band. The band is now one full screen (`.hero-band`,
+     global.css) and the reference headline is a DISPLAY size, so the
+     ceiling moved to 72 px and the mobile floor to 36 px. Measured reach:
+     36 px at 390 and 640, 42 px at 768, 56 px at 1024, 70 px at 1280,
+     72 px from ~1310 up.
+     `text-display` has exactly ONE consumer in `src/` (the hero h1 —
+     verified: `grep -rn text-display src/`), so this retune cannot move
+     any other heading. Leading tightened 1.05 → 1.02 and tracking
+     0.02em → 0.01em because a high-contrast display serif needs both; the
+     old values were tuned against Inter's much wider stems. */
+  --text-display:    clamp(2.25rem, 5.5vw, 4.5rem);
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.01em;
+
+  --text-section:    clamp(1.5rem, 3vw, 1.875rem);
+  --text-section--line-height: 1.15;
+  --text-section--letter-spacing: -0.01em;
+
+  --text-card-title: 1.25rem;
+  --text-card-title--line-height: 1.3;
+
+  --text-body:       1rem;
+  --text-body--line-height: 1.7;
+
+  --text-body-sm:    0.875rem;
+  --text-body-sm--line-height: 1.65;
+
+  /* Uppercase label. The wide tracking is what makes a 11 px eyebrow legible,
+     so it is part of the token rather than a class each caller adds. */
+  --text-eyebrow:    0.6875rem;
+  --text-eyebrow--line-height: 1.2;
+  --text-eyebrow--letter-spacing: 0.18em;
+
+  --text-caption:    0.75rem;
+  --text-caption--line-height: 1.4;
+  --text-caption--letter-spacing: 0.02em;
+
+  /* ── Motion tokens ───────────────────────────────────────────────
+     PERF / PERFECT-CURVE RATIONALE
+     ------------------------------
+     Three curves cover every state change in the app. Picking one per
+     *intent* removes the 40+ ad-hoc `ease-in` / `duration-700` /
+     `duration-1000` values that had drifted in, which is what made the
+     UI feel inconsistent rather than slow.
+
+     - out-expo  : decelerates hard, lands early. Reads as "instant"
+                   at 180ms, so most transitions got *faster* while
+                   feeling smoother. Default for entering UI.
+     - in-out-soft: symmetric, for reversible moves (drawer, accordion).
+     - spring    : slight overshoot. Reserved for direct-manipulation
+                   feedback (button press, card select) — never for
+                   layout, because the overshoot implies physicality
+                   that layout changes do not have.                    */
+  --ease-out-expo:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:      cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── Duration scale ──────────────────────────────────────────────
+     MEASURED 2026-09-26. The curve scale above existed; a DURATION
+     scale did not, so every call site invented its own. Counted in the
+     public components alone: 200, 300, 500 and 700ms, plus the 180ms
+     default — five speeds for what is meant to read as one system. A
+     hover that lifts a card took 300ms while the button inside it
+     answered in 180ms, so the card felt slower than its own contents.
+
+     Four steps, chosen by WHAT MOVES rather than by where it sits:
+
+     - press : 120ms. Colour and a 1px translate only. Must feel like
+               the control answered *now*; anything above ~150ms reads
+               as lag on a tap.
+     - hover : 180ms. Colour, border, shadow. Deliberately the SAME
+               value as `--default-transition-duration` below, so the
+               226 bare `transition` sites keep exactly the timing they
+               already have. This step formalises the default, it does
+               not change it.
+     - move  : 320ms. Transform — a card lifting, a panel sliding. A
+               displacement needs longer than a colour to read as
+               motion rather than as a jump.
+     - image : 560ms. A zoom inside a clipped frame. Large areas need
+               more time or the movement looks like a glitch; this is
+               the one place slow is correct, and it is why the old
+               700ms image zooms are pulled *down* rather than up.    */
+  --dur-press: 120ms;
+  --dur-hover: 180ms;
+  --dur-move:  320ms;
+  --dur-image: 560ms;
+
+  /* Defaults for the BARE `transition` utility (226 call sites).
+     Tailwind ships 150ms + ease-in-out; these two lines retune every
+     one of them at once with zero component edits.                    */
+  --default-transition-duration:        180ms;
+  --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Fixes `animate-slide-in`, used by Toast.tsx but previously defined
+     nowhere. Also takes over the hand-written .animate-fade-in.
+
+     PERF: only `opacity` + `transform` are animated. Both are
+     compositor-only — the element is promoted for the duration of the
+     animation and dropped afterwards, so there is no layout and no
+     paint per frame. Deliberately NOT translate3d(): for a one-shot
+     200ms tween the browser already promotes automatically, and
+     forcing a permanent 3D layer would cost memory for no gain.     */
+  --animate-slide-in: slide-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-fade-in:  fadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* ── 2b. Hero & visual enhancement tokens ────────────────────────────
+   These power the redesigned hero, footer, and section visuals.
+   They are CSS custom properties (not @theme tokens) because they are
+   consumed by hand-written CSS rules, not by Tailwind utilities.
+
+   WHY GRADIENTS INSTEAD OF BACKGROUND IMAGES
+   -------------------------------------------
+   The old hero and footer relied on external images from Supabase Storage
+   (tokyo_banner.jpg, sakura_footer.webp). That caused three problems:
+   1. SLOW — the images were 113–150 KB, loaded over an external CDN.
+   2. FRAGILE — a Supabase outage rendered the hero as a blank dark rectangle.
+   3. INCONSISTENT — the footer image sometimes lagged behind the theme toggle.
+
+   CSS gradients are zero-fetch, theme-responsive, and render in one paint. */
+
+:root {
+  /* Hero gradient — the three-stop sweep that replaces banner artwork. */
+  --hero-gradient: linear-gradient(
+    135deg,
+    #020617 0%,
+    #1e1b4b 40%,
+    #4c1d95 70%,
+    #831843 100%
+  );
+  --hero-glow: radial-gradient(
+    ellipse 60% 50% at 70% 60%,
+    rgba(219, 39, 119, 0.15) 0%,
+    transparent 70%
+  );
+
+  /* Footer gradient — darker, sits below the content. */
+  --footer-gradient: linear-gradient(
+    180deg,
+    #0f172a 0%,
+    #020617 100%
+  );
+
+  /* Subtle dot pattern for page background depth. size and gap tuned
+     to be barely visible — texture, not wallpaper. */
+  --bg-dot-color: rgba(148, 163, 184, 0.06);
+  --bg-dot-size: 1px;
+  --bg-dot-gap: 24px;
+
+  /* Section alternating tint — a barely-there shift that makes long
+     pages read as structured rather than monotone. */
+  --section-alt-bg: rgba(15, 23, 42, 0.4);
+
+  /* Accent glow for interactive elements. */
+  --glow-pink: 0 0 40px rgba(219, 39, 119, 0.2);
+  --glow-sky:  0 0 40px rgba(56, 189, 248, 0.15);
+
+  /* Gradient accent line — used above footer and as section dividers. */
+  --accent-line: linear-gradient(90deg, #ec4899, #8b5cf6, #38bdf8);
+}
+
+/* ── 3. Light palette — the default theme ("Sakura Editorial", light) ─
+   `html[…]` (specificity 0,1,1) outranks the `:root, :host` (0,1,0)
+   that Tailwind emits from @theme, so source order does not matter and
+   no !important is needed.
+
+   OWNER DECISION 2026-09-20: this is now the DEFAULT theme, not the
+   alternate one. It was retuned to match the approved design mockup —
+   a clean white body, near-black ink, and pink as the single accent,
+   with the deep navy reserved for the nav and the hero band.
+
+   ⚠ DO NOT wrap this in @layer — a layer would lose to @layer theme and
+     silently break light mode. Leave it unlayered.                     */
+html[data-theme="light"] {
+  /* The body is genuinely white in the mockup. The old #fbfafc was a
+     deliberate near-white to stop the sakura banner from being "the only
+     pink surface" — but the banner is no longer an image, so that
+     constraint expired with it. Pure white now, with surfaces tinted
+     instead, which is what gives the mockup's cards their lift. */
+  --color-canvas:          #ffffff;
+  --color-surface:         #ffffff;
+  --color-surface-raised:  #fff7fa;
+  --color-surface-sunken:  #fdf2f6;
+
+  /* Near-black ink rather than the old warm grey. The mockup's text is
+     high-contrast against white; 1f1d1c at 88% reads as a brown wash. */
+  --color-fg:              #16121c;
+  --color-fg-muted:        #514a5c;
+  --color-fg-subtle:       #726a80;
+
+  --color-line:            #f0dfe7;
+  --color-line-strong:     #dfc4d1;
+
+  /* Pink is THE accent. `#be185d` is kept for small text and icons
+     because it clears 4.5:1 on white; the brighter pair below is for
+     fills, where contrast is against the white label instead. */
+  --color-accent:          #be185d;
+  --color-accent-emerald:  #047857;
+  --color-accent-sky:      #0369a1;
+  --color-accent-red:      #b91c1c;
+  --color-accent-amber:    #b45309;
+  --color-accent-violet:   #6d28d9;
+
+  color-scheme: light;
+
+  /* ── Band surfaces ─────────────────────────────────────────────────
+     THE HERO AND CTA BAND DELIBERATELY STAY DARK IN LIGHT MODE.
+
+     This is the single most important decision in this block. The hero
+     markup puts `text-white` on its headline, its CTAs and its chips,
+     and the ClosingBand does the same. A light gradient behind white
+     text is unreadable — and it would be unreadable in the picture the
+     mockup is proudest of, which is exactly where nobody looks for it.
+
+     The mockup agrees: it is a WHITE page with a DARK hero band. So the
+     band tokens are near-duplicates of the dark theme's, not lightened
+     versions of them. Do not "fix" these to pastels. */
+  --hero-gradient: linear-gradient(
+    135deg,
+    #2a1235 0%,
+    #4a1b4e 34%,
+    #7a2350 66%,
+    #b0305f 100%
+  );
+  /* 0.26 -> 0.22, measured 2026-09-27. The hero headline's contrast against
+     this bloom was UNSTABLE across runs at 0.26: three runs gave a minimum
+     of 2.62 / 3.45 / 2.24 against the 3.0 floor for large text. The minimum
+     is set by a handful of pixels over the brightest point of the artwork,
+     so it moves every render — which is exactly why it has to be measured
+     repeatedly rather than once. At 0.22 all three runs give 3.66 (a stable
+     +22% headroom) while the bloom still visibly changes 23.7% of the band's
+     pixels. 0.18 was tried and is worse on BOTH counts: its worst run is
+     2.92 (touching the floor) and the bloom drops to 16% of pixels.
+     This is margin work, not a fix for a failure: the median was 4.88 and
+     already passed AA-large. */
+  --hero-glow: radial-gradient(
+    ellipse 70% 60% at 72% 42%,
+    rgba(255, 186, 214, 0.22) 0%,
+    transparent 72%
+  );
+  --footer-gradient: linear-gradient(180deg, #fff7fa 0%, #fdeef4 100%);
+
+  /* The dot texture is a LIGHT-mode detail: on white it reads as paper
+     grain, which is what gives the page its editorial feel. */
+  --bg-dot-color: rgba(190, 24, 93, 0.055);
+  --bg-dot-size: 1px;
+  --bg-dot-gap: 22px;
+
+  --section-alt-bg: rgba(253, 242, 246, 0.72);
+  --glow-pink: 0 0 40px rgba(219, 39, 119, 0.10);
+  --glow-sky:  0 0 40px rgba(14, 165, 233, 0.10);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}

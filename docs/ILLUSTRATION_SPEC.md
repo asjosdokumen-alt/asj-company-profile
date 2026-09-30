@@ -1,0 +1,353 @@
+# Spec Ilustrasi Anime + Arah Gamefeel
+
+Status: **SEBAGIAN TERPENUHI (2026-09-20).** **5 ilustrasi sudah masuk dan sudah
+dipasang** — hero, banner lokasi, dan 3 kartu program. Galeri 11 slot (§3 lama)
+**belum** dikerjakan dan kini diarsipkan. Lihat §3 di bawah untuk keadaan sebenarnya.
+
+> **Catatan pembaca:** daftar 11 slot yang dulu ada di §3 **sudah tidak berlaku**
+> dan disimpan di `docs/archive/ILLUSTRATION_SPEC_11-slot_2026-09-20.md`. Dokumen
+> ini dulu menyebut 11 berkas bernama `hero-berangkat`, `kelas-bahasa`, dst.; yang
+> benar-benar dikirim adalah **5 berkas dengan nama berbeda** (`hero-sakura`,
+> `lokasi-banner`, `program-bahasa`, `program-magang`, `program-ssw`). Dokumen
+> yang menyebut nama berkas yang tidak ada lebih buruk daripada tidak ada
+> dokumen, jadi §3 ditulis ulang dari berkas di disk — bukan dari rencana.
+
+Rujukan tema: `DESIGN.md` §1 “Sakura Editorial” (dark-first, bento, tipografi
+editorial, glass tertahan) dan §3 (token). Rujukan aturan aset: `docs/COMPANY_PROFILE_DATA.md` §11.2.
+
+---
+
+## 0. Kenapa dokumen ini ada (dan apa yang TIDAK bisa dilakukan)
+
+Permintaan owner 2026-09-20: *“semua photo ilustrasikan jadi anime saja, kita
+gamefikasikan web app kita, sesuai tema Jepang dan usia user.”*
+
+**Sesi ini TIDAK punya kemampuan menghasilkan gambar.** Tidak ada image generation
+maupun image-to-image. Jadi tidak ada “sesi ini mengubah foto jadi anime” — itu
+tidak akan terjadi, dan mengakuinya lebih berguna daripada mengerjakan sesuatu yang
+tidak mungkin. Yang bisa dikerjakan adalah **segala hal di sekitar gambar**:
+
+| | Dikerjakan di sini? |
+|---|---|
+| Menentukan daftar gambar, ukuran, isi, gaya | **Ya** — dokumen ini |
+| Menyiapkan slot aset + komponen agar gambar drop-in | **Ya** — tanpa ubah komponen |
+| **Memasang gambar yang sudah dibuat di luar** | **Ya** — sudah dilakukan, 5 slot |
+| Layer gamefeel (XP, badge, kartu level, animasi) | **Ya** — kode |
+| **Menghasilkan gambar anime-nya** | **Tidak.** Di luar kemampuan sesi ini |
+
+Konsekuensi jujur: gambar yang **sudah** dibuat di luar dipasang oleh sesi ini;
+gambar yang **belum** ada tetap membuat slotnya memakai foto/ikon sekarang.
+Layar gamefeel bisa dikerjakan lebih dulu karena tidak bergantung gambar.
+
+---
+
+## 1. Temuan yang mengubah bentuk pekerjaan: aset sudah siap tukar
+
+Diukur dari kode, bukan diasumsikan:
+
+- `GalleryItem` (`src/lib/gallery.ts`) = `{ src, alt, captionKey, caption, width, height }`.
+- Konsumennya **dua**: `GalleryGrid.tsx` (iterasi `GALLERY`) dan satu `<img>` langsung di `index.astro:484`.
+- **Tidak ada komponen yang peduli isi gambarnya** — hanya path dan dimensi.
+
+**Artinya: mengganti ilustrasi anime TIDAK butuh perubahan komponen sama sekali.**
+Yang berubah hanya `src`/`width`/`height` dan berkasnya. Itu leverage terbesar di
+sini, dan alasan kenapa pekerjaan kode bisa dimulai tanpa menunggu satu gambar pun.
+
+Pola berkas yang sudah terbukti di repo ini (`public/assets/ilustrasi/`, 5 slot ×
+4 berkas): **AVIF + WebP, dua kepadatan (`1x` dan `@2x`)**. Ilustrasi baru
+mengikuti pola itu.
+
+---
+
+## 2. Sistem visual ilustrasi
+
+Diturunkan dari gaya ilustrasi yang **sudah dipasang** (hero + 3 kartu program,
+§3) — bukan gaya baru, supaya halaman tidak terbelah dua bahasa visual.
+
+| Aspek | Ketentuan |
+|---|---|
+| Gaya | Anime 2D *cel-shaded*, garis tegas, warna flat + satu lapis bayangan. Bukan 3D, bukan semi-realistis |
+| Rasio tampilan | Lanskap, sekitar **4:3** atau **3:2** (ubin galeri). Tegak 4:5 hanya untuk potret |
+| Ukuran kerja | **1280×960** (atau 1600×1200) untuk lanskap; **828×1035** untuk potret |
+| Format keluar | WebP kualitas ~82 + AVIF; **tanpa teks di dalam gambar** |
+| Langit-langit | ≤350 KB per berkas `@2x` — galeri 9 ubin harus tetap ringan di ponsel kelas menengah (`DESIGN.md` §1.3, target LCP <1,5 s) |
+| Palet | Token repo: `--pink-600` (aksen, sakura), `--surface-raised`, `--line-strong`. Langit **senja Jepang** (indigo→magenta), bukan siang terang — halaman dark-first |
+| Latar | Setiap ilustrasi harus **terbaca di atas latar gelap**; hindari latar putih penuh |
+| Karakter | Kepala besar, mata ekspresif, seragam sederhana — konsisten dengan ilustrasi program yang sudah ada. **Usia karakter 18–22** |
+
+### 2.1 Aturan yang tidak boleh dilanggar
+
+1. **TIDAK ADA teks di dalam gambar.** Semua teks hidup sebagai teks halaman —
+   translatable, dan itu sudah jadi aturan repo (`GALLERY_EXCLUDED` menolak
+   `poster-rekrutmen.webp` justru karena teks & harga terbakar di piksel).
+   **Alasan aturan ini adalah translatability, bukan estetika** — dan itu yang
+   membedakan dua hal yang sering disamakan:
+   - **teks halaman yang dibakar ke piksel** (judul kartu, harga, label langkah):
+     dilarang, tanpa pengecualian. Pembaca berbahasa Jepang tidak punya cara
+     membacanya.
+   - **huruf insidental di dalam adegan** (papan tulis, sampul paspor, lembar
+     kontrak): ini yang muncul di `langkah-1..6` dan di `hero-sakura`
+     (`ASJ PORTAL` di jaket). Tidak ada yang perlu diterjemahkan karena tidak ada
+     yang membacanya sebagai UI.
+
+   ⚠ **Penyimpangan 2026-09-28 dicatat, bukan disembunyikan.** Enam ilustrasi
+   `langkah-*` mengandung huruf insidental jenis kedua. Aturan di atas tidak
+   diubah untuk membenarkannya: catatan ini ditulis supaya pembaca berikutnya
+   bertemu fakta itu **di berkasnya**, bukan saat membuka gambarnya. Tidak ada
+   judul/deskripsi langkah yang dibakar — semuanya tetap `data-lang`.
+2. **Tidak ada wajah orang nyata yang bisa dikenali.** Ini yang menyelesaikan
+   §11.2: ilustrasi menghapus kebutuhan consent. Kalau ilustrasi dibuat “berdasarkan”
+   orang tertentu, aturannya kembali berlaku.
+3. **Tidak ada logo/kop surat pihak ketiga** di dalam ilustrasi.
+4. **Tanpa bendera**, dan tidak menggambarkan adegan yang bisa dibaca sebagai
+   klaim kerja/penempatan yang belum terjadi.
+
+---
+
+## 3. Daftar gambar
+
+**Enam belas slot ilustrasi, dan semuanya sudah dipasang.** Tabel ini ditulis dari
+berkas yang ada di disk — dimensinya **diukur** dengan `sharp`, bukan disalin dari
+spesifikasi — dan dari markup yang benar-benar dirender. Kolom “Dipakai di”
+menyebut lokasi kode yang merender berkas itu, supaya klaim “sudah dipasang” bisa
+diperiksa, bukan dipercaya.
+
+> **Sumber kebenaran daftarnya ada di kode, bukan di sini.**
+> `scripts/ci/verify-assets.mjs` set `ILLUSTRATIONS` adalah daftar yang ditegakkan
+> gate: ilustrasi yang dirender tapi tidak terdaftar di situ membuat gate merah.
+> Tabel di bawah boleh tertinggal; jangan jadikan acuan saat memasang berkas baru.
+
+| # | Berkas (basename) | Peran | Ukuran 1x / @2x | Dipakai di | `loading` | `alt` |
+|---|---|---|---|---|---|---|
+| 1 | `hero-sakura` | Latar band hero: Fuji, pagoda, skyline, sakura senja | 1600×582 / 3200×1164 | `src/components/App.tsx` (varian `hero`) | `eager` | `""` (dekoratif) |
+| 2 | `lokasi-banner` | Pita skyline senja di atas kartu peta | 1200×600 / 2400×1200 | `src/pages/index.astro` §`#lokasi` | `lazy` | `""` (dekoratif) |
+| 3 | `program-magang` | Kartu Program: jalur Magang | 600×400 / 1200×800 | `src/lib/companyProfile.ts` → `PROGRAMS[0].image` | `lazy` | deskriptif |
+| 4 | `program-ssw` | Kartu Program: Tokutei Ginou | 600×400 / 1200×800 | `PROGRAMS[1].image` | `lazy` | deskriptif |
+| 5 | `program-bahasa` | Kartu Program: Bahasa Jepang | 600×400 / 1200×800 | `PROGRAMS[2].image` | `lazy` | deskriptif |
+| 6 | `langkah-1` | Langkah 1 — Registration | 560×400 / 1120×800 | `FLOW_STEPS[0].image` | `lazy` | deskriptif |
+| 7 | `langkah-2` | Langkah 2 — Training & Education | 560×400 / 1120×800 | `FLOW_STEPS[1].image` | `lazy` | deskriptif |
+| 8 | `langkah-3` | Langkah 3 — Interview | 560×400 / 1120×800 | `FLOW_STEPS[2].image` | `lazy` | deskriptif |
+| 9 | `langkah-4` | Langkah 4 — Employment Document | 560×400 / 1120×800 | `FLOW_STEPS[3].image` | `lazy` | deskriptif |
+| 10 | `langkah-5` | Langkah 5 — Document Preparing | 560×400 / 1120×800 | `FLOW_STEPS[4].image` | `lazy` | deskriptif |
+| 11 | `langkah-6` | Langkah 6 — GO TO JAPAN | 560×400 / 1120×800 | `FLOW_STEPS[5].image` | `lazy` | deskriptif |
+| 12 | `penempatan-banner` | Peta Jepang di pita `#penempatan` | 1200×900 / 2400×1800 | `src/pages/index.astro` §`#penempatan` | `lazy` | `""` (dekoratif) |
+| 13 | `qr-whatsapp` | Kode QR kontak | 256×256 / 512×512 | `src/pages/index.astro` §`#kontak` | `lazy` | deskriptif |
+| 14 | `qr-instagram` | Kode QR kontak | 256×256 / 512×512 | `src/pages/index.astro` §`#kontak` | `lazy` | deskriptif |
+| 15 | `qr-tiktok` | Kode QR kontak | 256×256 / 512×512 | `src/pages/index.astro` §`#kontak` | `lazy` | deskriptif |
+| 16 | `icons/logo-asj` | Emblem footer & halaman 404 (satu-satunya yang di luar `public/assets/`) | 500×500 / 1000×1000 | `src/components/Footer.astro`, `src/pages/404.astro` | `lazy` | deskriptif |
+
+Setiap slot dikirim dalam **4 berkas**: `.webp` + `.avif`, masing-masing 1x dan
+`@2x`.
+
+### 3.0 Dua koreksi terhadap tabel ini — keduanya hasil mengukur, 2026-09-28
+
+Ditulis di sini karena keduanya adalah contoh persis kenapa §3.2 menuntut
+“ukur, jangan salin”:
+
+1. **`hero-sakura` terukur 1600×582, bukan 1600×900.** Angka 1600×900 tertulis di
+   tabel lama dan **salah**; ia tidak pernah dipakai siapa pun untuk memasang
+   berkas (yang memasang memakai `width`/`height` dari komponennya sendiri).
+2. **Tiga QR dan emblem footer sudah dirender sejak 2026-09-24** tapi belum pernah
+   masuk tabel ini. Keduanya ada di `ILLUSTRATIONS` dan lolos gate, jadi
+   ketiadaannya di sini berarti tabelnya tertinggal — bukan bahwa berkasnya tidak
+   dipakai.
+
+**Perubahan artwork 2026-09-28.** Owner memasok empat berkas hasil generate
+(ChatGPT) dan memintanya dipasang: tiga ilustrasi kartu program, enam ilustrasi
+langkah, dan satu peta Jepang untuk pita `#penempatan`. Yang berubah:
+
+| Slot | Sebelum | Sesudah |
+|---|---|---|
+| `program-*` | gambar vektor datar, 4:3, 1200×900 | ilustrasi anime, **3:2, 600×400** — rasionya ikut artwork, karena kotak 4:3 di atas gambar 3:2 membuat `object-cover` membuang 14% lebar tiap kartu |
+| `langkah-1..6` | **tidak ada** — bagiannya teks saja | 6 ilustrasi, **7:5, 560×400**, dipotong dari satu komposit 1536×1024 |
+| `penempatan-banner` | foto Fuji + danau, 3:2, 1200×800 | **peta Jepang, 4:3, 1200×900** — di peta, pita yang terpotong itu Kyushu atau Hokkaido |
+
+Yang **tidak** berubah: tidak ada satu kata pun yang jadi bagian dari piksel.
+Judul dan deskripsi di kartu program maupun kartu langkah tetap `Text` ber-`key`
+yang dirender sebagai `data-lang`, jadi toggle ID/EN/JP tetap menjangkaunya.
+
+### 3.1 Kenapa `alt` berbeda: dekoratif vs deskriptif
+
+Ini bukan kelalaian, dan bukan pilihan per-berkas yang bisa dibalik tanpa alasan.
+
+- **Hero dan banner lokasi** memakai `alt=""` + `aria-hidden="true"`. Keduanya
+  mengulang makna yang **sudah** dinyatakan teks: hero punya `h1` (“Karier ke
+  Jepang, dimulai dari sini.”) dan seksi lokasi sudah menyebut nama serta alamat.
+  Membacakannya lagi membuat pembaca layar mengucapkan gagasan yang sama dua kali.
+- **Kartu program dan kartu langkah** memakai `alt` deskriptif, karena di sana
+  gambar memang membawa isi: pabrik untuk penempatan SSW, buku untuk pelatihan
+  bahasa, kelas untuk langkah Training & Education. Aturan yang dipakai bukan
+  “apakah ini ilustrasi” melainkan **apakah gambar ini mengulang kalimat yang
+  sudah ada di sebelahnya**. Pada kartu, judul kartunya pendek dan gambarnya
+  menambah — jadi `alt` deskriptif. Pada hero dan pita `#penempatan`, teks di
+  sekitarnya sudah menyatakan hal yang sama, jadi `alt=""`.
+
+### 3.2 Cara memasang berikutnya (kontrak yang sudah terbukti)
+
+Menukar artwork **tidak butuh perubahan komponen** — itu klaim lama dan sudah
+terbukti benar di 5 slot ini. Yang dibutuhkan hanya:
+
+1. Buat 4 berkas dengan basename sama di `public/assets/ilustrasi/`.
+2. Untuk kartu program: isi `image: { name, alt, w, h }` pada `Tile` di
+   `src/lib/companyProfile.ts`. `name` adalah **basename saja**, bukan path.
+   Untuk kartu langkah, bentuk field-nya **sama persis**, hanya objeknya `Step`:
+   `FLOW_STEPS[n].image`. `Step.image` opsional sejak 2026-09-28, dan
+   `IconTileGrid.tsx` / `StepList.tsx` memakai markup gambar yang sengaja
+   identik, jadi keduanya tidak bisa berbeda padding atau rasio.
+3. Untuk slot hero/banner: `<picture>` sudah ada; cukup ganti `srcset` dan
+   `width`/`height` di `App.tsx` / `index.astro`.
+
+`w`/`h` harus **diukur dari berkas**, bukan disalin dari spesifikasi — itu langkah
+pertama §4 dan alasannya masih berlaku.
+
+### 3.3 Galeri 11 slot: DITUNDA, bukan dibatalkan
+
+Daftar 11 slot lama (galeri fasilitas + potret pengajar) **belum dikerjakan** dan
+diarsipkan di `docs/archive/ILLUSTRATION_SPEC_11-slot_2026-09-20.md`. Alasan
+penundaannya masih sah: empat slot berwajah (§11.2) butuh ilustrasi untuk
+menggantikan foto yang tidak punya basis consent. Ketika galeri itu dikerjakan,
+nama berkasnya kemungkinan tetap seperti di arsip — tetapi **jangan** anggap tabel
+arsip itu sebagai keadaan sekarang.
+
+---
+
+## 4. Setelah gambar ada: yang harus dilakukan
+
+§4.1–§4.4 **sudah dilakukan** untuk 5 slot di §3; sisanya berlaku untuk slot baru.
+Urutan ini penting; melompat ke “ganti path” tanpa langkah 1 akan memerahkan gate.
+
+1. **Ukur tiap berkas** (`width`/`height` sebenarnya) — jangan percaya angka spesifikasi.
+   `GalleryItem` mensyaratkan dimensi intrinsik; salah di sini = layout shift.
+2. Turunkan AVIF + WebP (1x & @2x) mengikuti pola `public/assets/ilustrasi/`.
+3. Perbarui `GALLERY` (atau tambahkan `GALLERY_ILLUSTRATED`) di `src/lib/gallery.ts`.
+4. Perbarui `<img>` di `index.astro:484`.
+5. **Perbarui `scripts/ci/verify-assets.mjs`**: ilustrasi **tidak boleh** masuk
+   daftar blokir `.gitignore`, dan tidak boleh ada di `CONSENT_OPEN` — ilustrasi
+   tidak punya basis consent karena tidak ada orang nyata. Gate akan menuntun ini.
+6. `npm run verify:assets && npm run lint-ratchet && node node_modules/vitest/vitest.mjs run`
+
+---
+
+## 5. Batas: ini bukan penghapusan foto
+
+Foto asli tetap di disk. Setelah ilustrasi menggantikan wajah di halaman, daftar
+blokir `.gitignore` **masih berlaku** untuk foto asli, dan `CONSENT_OPEN` di
+`src/lib/gallery.ts` menjadi **tidak relevan untuk tayang** (karena yang tayang
+ilustrasi) — tapi jangan dihapus sebelum diperiksa: gate check (f) akan meminta
+annotasi selama entri itu masih tayang. Urutan aman: ganti entri dulu, baru
+bersihkan `CONSENT_OPEN` di commit terpisah.
+
+---
+
+## 6. Layer gamefeel — yang bisa dikerjakan TANPA gambar
+
+Ini bagian yang tidak menunggu apa pun. Semuanya **rasa game, bukan game**
+(pilihan owner): tidak ada gameplay, tidak ada backend baru, tidak ada tabel.
+
+### 6.0 Temuan lebih dulu: separuh gamefeel SUDAH ADA — tapi bukan di halaman publik
+
+Diukur, bukan diasumsikan:
+
+| Ada di mana | Isi | Status |
+|---|---|---|
+| `src/lib/profileProgress.ts` | `computeCvMiniProgress`, `computeCvMasterProgress`, `computeOverallProgress`, `filledPercent` | **sudah ada** |
+| `src/components/candidate/CandidateDash.tsx` | `CrownBadge` — 👑 ≥100%, 🥈 ≥50%, 🥉 >0% | **sudah ada** |
+| `src/pages/candidate.astro` | memasang `CandidateDash` | **di balik login** |
+| `src/pages/index.astro` (landing publik) | — | **nol progress, nol badge** |
+
+**Konsekuensi yang mengubah rencana:** “gamefikasikan web app” bukan satu pekerjaan,
+tapi dua, dan risikonya jauh berbeda.
+
+1. **Halaman kandidat (sudah login)** — memperkaya yang sudah ada. Datanya nyata
+   (persentase kelengkapan profil), jadi badge di sini **berbasis fakta**, bukan
+   karangan. Risiko: rendah. Yang perlu dijaga hanya §6.1 di bawah.
+2. **Landing publik (belum login)** — di sini **tidak ada data apa pun** tentang
+   pengunjung, karena mereka belum punya akun. Badge/XP di halaman ini **hanya bisa
+   fiktif** kalau dipaksakan. Jadi gamefeel di landing harus berbentuk hal yang
+   tidak butuh state pribadi: ilustrasi, animasi masuk, tipografi.
+
+**Jangan** menaruh progress pribadi di halaman publik tanpa login — itu bukan
+gamefeel, itu kebocoran rasa “halaman ini mengawasi saya”.
+
+### 6.1 Elemen, sumber data, dan risiko
+
+| Elemen | Di mana | Sumber data | Risiko |
+|---|---|---|---|
+| Kartu level + badge pencapaian | `/candidate` | `computeOverallProgress()` yang sudah ada | rendah |
+| Progress per-bagian (CV mini, CV master, berkas) | `/candidate` | sudah ada (`berkasProgress`/`berkasTotal`) | rendah |
+| Pemandu langkah + ikon bagian | `/candidate` | sprite `Icon` sudah ada | rendah |
+| Animasi masuk untuk ubin & kartu | keduanya | CSS saja | rendah |
+| Ilustrasi anime menggantikan foto | landing | berkas statis | sedang — tunggu gambar |
+| Tipografi/panel bertema Jepang (asano-ha, gelombang) | landing | CSS/SVG | rendah |
+
+### 6.2 Dua batas etis yang harus dipegang
+
+1. **Jangan memberi skor seleksi.** Kandidat tidak boleh melihat angka yang bisa
+   dibaca sebagai peluang diterima. `computeOverallProgress` mengukur
+   **kelengkapan berkas**, bukan penilaian — jangan sampai presentasinya berubah
+   makna. Ini sudah dijaga di kode; jangan diubah jadi “skor profil”.
+2. **Jangan membuat progres yang turun menghukum.** Bar yang mundur karena berkas
+   ditolak akan terbaca sebagai kegagalan pribadi, di konteks orang yang sedang
+   mencari kerja. Perubahan pada `profileProgress.ts` harus mempertahankan sifat
+   “hanya naik selama berkas tetap ada”, dan penurunan tidak dirayakan.
+
+Keduanya ditulis di sini supaya orang berikutnya tidak “meningkatkan” gamifikasi
+dengan menambahkan skor kompetitif atau papan peringkat antar-kandidat.
+
+## 7. Mascot pemandu — DIHAPUS (2026-09-24)
+
+Bagian ini dulu menjelaskan **mascot di landing publik** (`index.astro`): gambar
+2D yang bertukar pose dan animasi mengikuti section. **Owner memutuskan mascot
+dihapus dari seluruh situs pada 2026-09-24.** Alasannya: `/` adalah **profil
+perusahaan untuk mitra**, bukan papan lowongan atau halaman rekrutmen, dan
+mascot tidak lagi cocok dengan peran itu. Ia hilang dari landing, dari
+`/candidate` (pemandu langkah), dari halaman 404, dan dari kartu login.
+
+Yang menggantikan dan yang tersisa:
+
+- **Ikon** dari sprite (`src/components/ui/Icon.tsx`, `src/icons/sprite-map.ts`)
+  mengisi setiap slot yang dulu dipegang mascot. Nama ikon yang tidak ada di
+  `sprite-map.ts` dirender sebagai **KOSONG tanpa error** — jadi himpunannya
+  dipatok terhadap peta yang di-generate (`StepGuide.test.ts`), bukan disalin
+  tangan.
+- `src/lib/sectionMotion.ts` sekarang **hanya** memegang transisi masuk
+  (`ENTER_KINDS` + `SECTION_MOTION` tanpa kolom `pose`/`motion`). Kolom
+  mascot-nya dibuang bersama mascot-nya.
+- Seluruh berkas mascot (`src/components/ui/Mascot.tsx`,
+  `src/components/public/PrincessMascot.astro`, `public/mascot/*`), gate-nya
+  (`e2e/test-mascot-motion.mjs`), dua alat buktinya (`e2e/measure-mascot.mjs`,
+  `e2e/shot-mascot.mjs`), dan baterai mutasinya **sudah dihapus**.
+
+### 7.1 Dua cacat yang tetap layak dikenang
+
+Keduanya **tidak error, tidak merah di test apa pun, dan tidak terlihat di
+konsol**, dan keduanya pelajaran umum yang tidak bergantung pada mascot.
+
+**Cacat 1 — blok tracking dijalankan saat PARSE, sebelum `<body>` ada.**
+Skripnya ada di `<head is:inline>` dan memanggil `document.querySelector(...)`
+saat parse, ketika `document.body` belum ada (diukur: `readyState: "loading"`,
+`bodyExists: false`). Hasilnya `null`, lalu guard keluar **tanpa suara**. Ini
+alasan helper `onReady()` dulu ada: jalankan sekarang kalau dokumen sudah siap,
+kalau belum tunggu `DOMContentLoaded`.
+
+**Cacat 2 — menulis atribut yang TIDAK ADA yang membaca.**
+Pertukaran pose dulu hanya menulis `data-pose`. `grep -rn 'data-pose' src/`
+hanya menemukan **penulis**, bukan pembaca — tidak ada stylesheet yang
+menyeleksinya, jadi atributnya berubah (`princess-peace`, …) sementara
+**gambarnya tetap**. Dan karena wadahnya `<picture>`, menulis `<img src>` saja
+tidak cukup: yang dipilih browser adalah `<source srcset>`, jadi ketiganya harus
+ditulis sekaligus. Pelajaran umumnya: sebuah atribut tanpa pembaca adalah no-op
+yang menyamar sebagai fitur.
+
+### 7.2 Jebakan pengukuran yang sudah memakan korban
+
+Tabel ini lahir saat mengukur mascot, tapi tiap barisnya umum untuk tiap elemen
+ber-animasi di halaman ini:
+
+| Jebakan | Kenyataan yang diukur |
+|---|---|
+| `display:none` tetap “menyelesaikan” CSS | `animation-name`/`opacity` benar pada elemen tersembunyi. Hanya **box** (`getBoundingClientRect`) yang jujur — elemen `hidden` di lebar tertentu tetap melaporkan animasi yang “berjalan” |
+| `loading="lazy"` tidak dipicu `scrollTo` | `page.mouse.wheel()` memicu fetch; `window.scrollTo()` dan `scrollIntoView()` **tidak** |
+| Walk menghancurkan keadaan yang ia ukur | langkah pertama walk adalah scroll, jadi koreksi sudah terjadi **sebelum** pengukuran pertama. Keadaan “saat baru tiba” butuh pengukuran **terpisah sebelum scroll** |
+| `img.decode()` | crash renderer di halaman 390px (1161 node, 22 gambar). Pakai poll `complete` berbatas waktu |
+

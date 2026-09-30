@@ -1,0 +1,1724 @@
+/* ============================================================
+   ASJ Portal — Motion Layer
+   ============================================================
+
+   THE ONE RULE
+   ------------
+   Only `transform` and `opacity` are animated or transitioned.
+
+   Why: these two are handled by the compositor. Everything else —
+   width, height, top/left, margin, box-shadow, filter, background —
+   forces the browser back through Style → Layout → Paint on every
+   single frame. A `transition: all` on a 200-row table therefore
+   costs 200 layout passes per hover, while `transition: background-color`
+   costs zero.
+
+   WILL-CHANGE DISCIPLINE
+   ----------------------
+   `will-change` is a promise, not a hint: each declaration allocates a
+   compositor layer (GPU memory) whether or not the animation runs. It
+   is used below ONLY on elements that animate forever (marquee, petals)
+   or that are about to animate. It is never used as a blanket
+   performance spell — that is the classic way to make a page slower.
+
+   EASING
+   ------
+   All curves come from theme.css (`--ease-out-expo` etc.) so motion
+   stays consistent without anyone re-deriving a cubic-bezier.
+   ============================================================ */
+
+
+/* ══════════════════════════════════════════════════════════════════
+   1. MARQUEE — Pengumuman Berjalan
+   ══════════════════════════════════════════════════════════════════
+
+   WHAT CHANGED AND WHY
+   --------------------
+   Old version:
+     .marquee-content { padding-left: 100%; animation: … translateX(-100%) }
+
+   Two problems:
+   (a) `padding-left: 100%` is a LAYOUT property doing an animation's
+       job. The element's width (and therefore the -100% translation
+       distance) depends on the container width, so every resize
+       reflows the track and the animation distance changes under it.
+   (b) With one copy of the text, translating -100% leaves a dead gap:
+       the tail exits before the head re-enters.
+
+   New version: TWO copies of the text inside a `width: max-content`
+   flex row, animating to translate3d(-50%, 0, 0). -50% is exactly one
+   copy, so the loop is mathematically seamless at any text length, and
+   the distance is derived from content instead of from the container.
+   The gap between copies is `padding-inline-end`, not `gap` — with
+   `gap`, -50% would land half a gap off and the seam would show.
+
+   ON LAYER PROMOTION — `will-change: transform` below is what actually
+   guarantees the compositor layer, not the `translate3d` syntax. Modern
+   engines promote any element with a running transform animation, but
+   they do it a frame or two late, which is exactly where low-end
+   Android drops frames. Declaring `will-change` up front (justified
+   here because the animation genuinely never stops) removes that hitch.
+
+   `translate3d` is kept in the source as a readable signal of intent
+   and as a hint for dev builds; it is NOT a performance trick —
+   `translate3d(x, y, 0)` and `translate(x, y)` are equivalent, and
+   Lightning CSS rewrites one to the other in the production bundle.
+   ------------------------------------------------------------------ */
+
+.marquee-track {
+  width: 100%;
+  overflow: hidden;
+  /* Isolates the scrolling text from the rest of the page: the browser
+     can repaint the strip without invalidating its ancestors. */
+  contain: layout paint;
+}
+
+.marquee-content {
+  display: flex;
+  width: max-content;                 /* size to BOTH copies, not to 100% */
+  /* Readable-speed default; overridable per instance. */
+  animation: marquee-scroll var(--marquee-duration, 24s) linear infinite;
+  will-change: transform;             /* justified: animates forever */
+}
+
+.marquee-item {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  /* The seam gap. Must be padding, not `gap` — see header note. */
+  padding-inline-end: 3rem;
+}
+
+@keyframes marquee-scroll {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+
+/* Pause on hover, and on keyboard focus, so the text is actually
+   readable — a marquee that cannot be stopped fails WCAG 2.2.2
+   (Pause, Stop, Hide). Only on real pointers; on touch there is no
+   hover state to latch onto. */
+@media (hover: hover) and (pointer: fine) {
+  .marquee-track:hover .marquee-content,
+  .marquee-track:focus-within .marquee-content {
+    animation-play-state: paused;
+  }
+}
+
+/* Reduced motion: the generic `*` rule in global.css would clamp the
+   duration to 0.01ms and leave the strip frozen half-scrolled, which
+   is worse than not moving. Instead: drop the animation, drop the
+   duplicate copy, and let the track scroll normally if the text is
+   longer than the strip. */
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { overflow-x: auto; }
+  .marquee-content {
+    width: auto !important;
+    animation: none !important;
+    transform: none !important;
+  }
+  .marquee-item + .marquee-item { display: none !important; }
+  .marquee-item { padding-inline-end: 0 !important; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   2. SAKURA PETALS
+   ══════════════════════════════════════════════════════════════════
+
+   RESTORED 2026-09-25 (owner request, item 6). The falling-sakura layer
+   existed in the legacy app and was recovered verbatim; these rules are
+   its port. The container ships in `BaseLayout.astro`
+   (`#sakura-particles`, `hidden`) and a deferred module fills it with
+   30 petals exactly once, only while the light/"SAKURA" theme is active.
+
+   WHAT WAS WRONG BEFORE (the dormant state this replaces)
+   -------------------------------------------------------
+   The rules below used to say the feature was "dormant" and that the
+   container "ships with `hidden`" — but nothing ever removed that class,
+   so the layer was dead code: 0 petals rendered on every route, in every
+   theme. Two of the dormant rules also contradicted the legacy spec:
+     · only `sakuraFall` was defined, so the 45% of petals the generator
+       assigns `sakuraFall2` would have animated with NO keyframes (frozen
+       at their start frame); and
+     · `@media (prefers-reduced-motion: reduce)` set `display: none`, which
+       REMOVES the petals. Legacy deliberately did the opposite — it
+       OVERRODE its own global clamp so petals keep falling at a fixed
+       `12s` (`main.css:2127`). Reduced motion means "less", not "none",
+       and the layer is `pointer-events: none` decoration that moves slowly
+       enough to be non-vestibular. That intent is reproduced below.
+
+   The keyframes already animated `transform` — that part was right.
+   The remaining costs were:
+   - Promotion left to chance: `will-change: transform` now makes each
+     petal a real compositor layer from frame one instead of being
+     promoted mid-fall (which drops the first frames on low-end
+     Android).
+   - No containment, so every petal invalidated the whole fixed
+     overlay on each frame.
+   - Unbounded petal count on small screens.
+   ------------------------------------------------------------------ */
+
+#sakura-particles {
+  /* `z-index: 1` matches the legacy value (`main.css:1961`). It sits
+     ABOVE the canvas background but BELOW every piece of chrome — the
+     header is `z-10`+ and the app's Z_INDEX scale starts at 30 — so the
+     petals are pure atmosphere and can never cover a control. */
+  z-index: 1;
+  /* Load-bearing: the layer is full-viewport, so without this every
+     click on the page would land on a petal. */
+  pointer-events: none;
+  /* Paint containment: petals are clipped and cannot dirty anything
+     outside this box. `size` is deliberately excluded — it would
+     collapse the inset-0 box. */
+  contain: layout paint style;
+}
+
+.sakura-petal {
+  position: absolute;
+  top: -24px;
+  width: 12px;
+  height: 12px;
+  background: radial-gradient(circle at 32% 30%, #fecdd3, #fb7185);
+  border-radius: 62% 38% 58% 42% / 60% 55% 45% 40%;
+  box-shadow: inset -1px -1px 2px #be123c40;
+  /* Default track + timing. The generator overrides `animation-name`,
+     `animation-duration` and `animation-delay` per petal; what it does
+     NOT override is `linear` and `infinite`, which is why they live
+     here as the shared baseline. */
+  animation: sakuraFall linear infinite;
+  /* Gradients and inset shadows are painted once into the layer, then
+     only transformed — so they stop being a per-frame cost. */
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* `linear` is correct for falling physics; the easing lives in the
+   keyframe distribution (the 25/50/75 stops already vary speed). */
+@keyframes sakuraFall {
+  0%   { transform: translate3d(0, -30px, 0)      rotate(0deg); }
+  25%  { transform: translate3d(24px, 26vh, 0)    rotate(95deg); }
+  50%  { transform: translate3d(-18px, 52vh, 0)   rotate(185deg); }
+  75%  { transform: translate3d(22px, 78vh, 0)    rotate(275deg); }
+  100% { transform: translate3d(0, 106vh, 0)      rotate(360deg); }
+}
+
+/* The second, WIDER track. The generator assigns this to ~45% of petals
+   so the fall does not read as one repeated path (`main.css:1990`). */
+@keyframes sakuraFall2 {
+  0%   { transform: translate3d(0, -30px, 0)      rotate(0deg); }
+  15%  { transform: translate3d(-34px, 16vh, 0)   rotate(120deg); }
+  35%  { transform: translate3d(26px, 38vh, 0)    rotate(-60deg); }
+  55%  { transform: translate3d(-24px, 58vh, 0)   rotate(210deg); }
+  75%  { transform: translate3d(38px, 80vh, 0)    rotate(80deg); }
+  100% { transform: translate3d(0, 106vh, 0)      rotate(360deg); }
+}
+
+/* Responsive budget: petals are pure decoration. On phones — where
+   GPU memory and fill rate are the tightest — cap the count rather
+   than dropping the effect entirely. */
+@media (max-width: 640px) {
+  .sakura-petal:nth-child(n + 13) { display: none; }
+}
+
+/* Reduced motion: petals KEEP falling, they just settle to a fixed slow
+   cadence. This is a DELIBERATE override of the global clamp in
+   global.css §8 (`animation-duration: 0.01ms !important;
+   animation-iteration-count: 1 !important`), which would otherwise stop
+   them dead on frame one — `main.css:2118-2131` did exactly the same,
+   and for the same reason: the clamp is a blunt instrument that is wrong
+   for a slow, non-vestibular ambient layer. `12s`/`infinite` is the
+   legacy value. The `#sakura-particles { display: none }` rule that
+   used to live in §8 is REMOVED — it contradicted this intent and hid
+   the layer from exactly the users it was written to serve. */
+@media (prefers-reduced-motion: reduce) {
+  .sakura-petal {
+    /* biome-ignore lint/complexity/noImportantStyles: must outrank the global
+       reduced-motion clamp in global.css §8 (a universal `*` selector that sets
+       animation-duration: 0.01ms !important). Without `!important` the petals
+       freeze instead of falling slowly — see motion.css §2 and
+       BaseLayout.sakura.test.ts. */
+    animation-duration: 12s !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same reason as above —
+       the global clamp sets animation-iteration-count: 1 !important, so the
+       petals must outrank it to keep falling. */
+    animation-iteration-count: infinite !important;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   3. TRANSITION PRESETS — the replacement for `transition-all`
+   ══════════════════════════════════════════════════════════════════
+
+   `transition-all` appears 26 times. Two costs:
+
+   1. COST PER FRAME — the engine must diff *every* animatable property
+      on every frame, not just the one that changed.
+   2. LATENT BUG — it is a promise to animate anything added later. A
+      row with `transition-all hover:bg-white/5` that later gains
+      `hover:scale-105` silently starts animating width, height,
+      padding and margin too, i.e. a full table layout on hover.
+
+   PREFER THE STOCK TAILWIND UTILITY where one exists — it is already
+   scoped, already familiar, and emitted on demand:
+
+       colour changes      → transition-colors   (covers fill + stroke
+                                                  for inline SVG icons)
+       transform / scale   → transition-transform
+       opacity             → transition-opacity
+       shadow              → transition-shadow
+       none                → transition-none
+       overshoot feel      → transition-transform ease-spring
+
+   Only the one combination Tailwind cannot express as a single named
+   utility is defined here.
+   ------------------------------------------------------------------ */
+
+.t-elevate {
+  /* Depth feedback: focus rings and card lift — box-shadow + border-color.
+     Both are PAINT-only properties — unlike `transition-all`, this can
+     never accidentally animate `border-width` (a layout property),
+     which is what makes inputs visibly jump on focus in some themes. */
+  transition-property: box-shadow, border-color;
+  transition-duration: var(--default-transition-duration);
+  transition-timing-function: var(--ease-out-expo);
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   4. HOVER EFFECTS, GUARDED
+   ══════════════════════════════════════════════════════════════════
+
+   `@media (hover: hover) and (pointer: fine)` is the cross-browser
+   way to ask "does this device have a real pointer?". Without it,
+   touch browsers emulate `:hover` on tap and leave the element stuck
+   in its hover state until the user taps elsewhere — a long-standing
+   complaint on the mobile job list.
+
+   Note on `will-change`: setting it inside `:hover` is too late (the
+   transition has already begun). It is set on the *wrapper's* hover
+   below, which is the standard workaround — the layer is created a
+   frame before the child moves. Use `.lift-wrap` on the parent of
+   anything using `.hover-lift` when the effect is on a dense list.
+   ------------------------------------------------------------------ */
+
+@media (hover: hover) and (pointer: fine) {
+  .hover-lift {
+    transition: transform 180ms var(--ease-out-expo);
+  }
+  .hover-lift:hover { transform: translateY(-2px); }
+
+  .hover-grow {
+    transition: transform 180ms var(--ease-spring);
+  }
+  .hover-grow:hover { transform: scale(1.05); }
+
+  .lift-wrap:hover .hover-lift,
+  .lift-wrap:hover .hover-grow { will-change: transform; }
+}
+
+/* Keyboard parity: hover-only affordances are invisible to keyboard
+   users. `:focus-visible` gets the same treatment. */
+.hover-lift:focus-visible,
+.hover-grow:focus-visible { transform: translateY(-2px); }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   5. BACKDROP BLUR
+   ══════════════════════════════════════════════════════════════════
+
+   Ten full-screen modals use `backdrop-blur-md`. `backdrop-filter` is
+   the most expensive paint operation in the app: the browser must
+   snapshot everything behind the element and run a blur pass over it.
+
+   While a modal is open the page behind is static, so it blurs once and
+   the cost is acceptable. Two rules keep it that way:
+
+   - NEVER put `will-change: backdrop-filter` on these. It pins a
+     full-viewport buffer in GPU memory for the whole session.
+   - Respect `prefers-reduced-transparency`, the OS-level "reduce
+     translucency" switch (macOS / Windows / iOS). Users who enable it
+     usually do so because blur makes them motion-sick or hurts
+     legibility — the opaque fallback is both kinder and much cheaper.
+   ------------------------------------------------------------------ */
+
+@media (prefers-reduced-transparency: reduce) {
+  .u-modal-shell,
+  .u-backdrop-blur {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: rgb(2 6 23 / 0.96) !important;
+  }
+}
+
+/* Firefox shipped backdrop-filter in 144; until then the element just
+   shows its translucent background, which is still legible because
+   every modal pairs `backdrop-blur-md` with `bg-black/80`. No @supports
+   polyfill needed — this is a progressive enhancement, not a
+   requirement. */
+
+
+/* ══════════════════════════════════════════════════════════════════
+   5b. MODAL ENTRY — the panel ARRIVES instead of appearing
+   ══════════════════════════════════════════════════════════════════
+
+   Added 2026-09-28. Before this, every overlay in the repo "popped": the
+   panel was there on one frame and absent the frame before, with no
+   transition anywhere. MEASURED across the six modals on /candidate —
+   `ChangePasswordModal`, `CvMiniModal`, `InterviewSimulatorModal`,
+   `EsignNaiteiModal`, `PemberkasanModal`, `RirekishoBuilder` — and the
+   count of transitions on their panels was 0.
+
+   WHY `@starting-style` AND NOTHING ELSE
+   --------------------------------------
+   Every modal here is conditionally rendered — `{showX && <Modal/>}`
+   (`CandidateDash.tsx:783-789` and ~24 more places). The element is
+   MOUNTED on open, so there is no previous state to transition FROM.
+   That is exactly the gap `@starting-style` fills: it declares the state
+   the browser starts from on an element's FIRST render.
+
+   MEASURED on this repo's own mount pattern, Chromium, panel opacity:
+       t0 = 0        t+30ms = 0.43        t+330ms = 1
+   No component edit, no JS, no class toggling. `useOverlay` — and so all
+   28 call sites — is untouched by this block.
+
+   WHY THERE IS NO `@supports` GUARD, AND WHY THAT IS NOT SLOPPY
+   -------------------------------------------------------------
+   `@starting-style` is an AT-RULE. A browser that does not know it
+   ignores the rule AND ITS CONTENTS, then renders the element at its
+   normal computed style — opacity 1, i.e. exactly today's behaviour.
+   The degradation is the at-rule's own semantics, not a fallback we
+   wrote, so a wrapper would add a line that cannot ever fire.
+
+   An `@supports (transition-behavior: allow-discrete)` wrapper is
+   specifically WRONG here: it would guard a property this rule never
+   uses. Entry from a fresh mount transitions `opacity` and `transform`,
+   never `display`, so `allow-discrete` is irrelevant — and so is
+   `overlay`, which only matters for TOP-LAYER elements. These overlays
+   are `position: fixed` divs, not `<dialog>`/popover.
+
+   WHY THE SCRIM IS SELECTED WITH `:has(> *)`
+   -------------------------------------------
+   The scrim IS the `.u-modal-shell` element; the panel is its child.
+   Animating every overlay would override a real, intended
+   `transition-opacity duration-300` on exactly one of them —
+   `AdminPanel.tsx:177`, the sidebar scrim — because these rules are
+   unlayered and unlayered beats Tailwind's `@layer utilities`.
+
+   That scrim and `App.tsx:721` (the drawer scrim) are the only two
+   `u-modal-shell` elements with NO element children, so `:has(> *)`
+   excludes precisely the two that must be excluded and keeps all ~30
+   real modals. VERIFIED by grep over `src/`: `AdminPanel.tsx:177` is the
+   ONLY place that pairs `u-modal-shell` with a `transition`.
+
+   DURATIONS COME FROM THE EXISTING SCALE — NO FIFTH STEP INVENTED
+   ---------------------------------------------------------------
+   Panel = a displacement → `--dur-move` (320ms), which theme.css already
+   documents as "a panel sliding". Scrim = opacity only → `--dur-hover`
+   (180ms). Published guidance for a modal entrance is 150–250ms, so
+   320ms sits at the TOP of that range; `--ease-out-expo` decelerates
+   hard and lands early, which is why it reads faster than it measures.
+   Using the token the repo already named for this job beats inventing a
+   sixth speed for one component.
+
+   REDUCED MOTION REMOVES THE EFFECT, IT DOES NOT SHORTEN IT
+   ---------------------------------------------------------
+   The whole block sits inside `no-preference`. Under `reduce` there is
+   no `@starting-style` at all, so the panel is NEVER at opacity 0 — no
+   window exists in which a reduced-motion user sees a blank panel. That
+   is strictly safer than relying on a duration clamp: measured with the
+   clamp alone the element also lands at 1, but it still passes through
+   0 on the first frame.
+
+   NOT DONE HERE, AND WHY: exit animation. It cannot be done in CSS on
+   this codebase. `{showX && <Modal/>}` unmounts the node the moment
+   `showX` flips, so there is no element left to animate — MEASURED, the
+   node is gone in the same frame. Exit needs `useOverlay` to hold the
+   overlay mounted for one transition, which is a separate, larger
+   change. See deliverables/gstack/riset-referensi-kelayakan-modal-2026-09-28.md
+   ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Scrim: opacity only. `:has(> *)` skips the two childless scrims, and
+     `:not([aria-hidden="true"])` skips the ambient layers.
+
+     THAT SECOND GUARD IS NOT DECORATION — IT WAS A REAL DEFECT, MEASURED.
+     The first version of this block had only `:has(> *)`, and
+     `#sakura-particles` (App.tsx — `fixed inset-0 u-modal-shell
+     overflow-hidden`, `aria-hidden="true"`, THIRTY child petals) matched it.
+     Probed in the browser: `matchesScrimRule: true`, and the layer came back
+     carrying `transition: opacity 0.18s` it was never meant to have. Any
+     later opacity change on that layer would then animate over 180ms instead
+     of landing instantly, and the layer itself faded in on every page load.
+     The panel selector already excluded `aria-hidden`; the scrim selector
+     did not. Both now do. */
+  .u-modal-shell:has(> *):not([aria-hidden="true"]) {
+    transition: opacity var(--dur-hover) var(--ease-out-expo);
+  }
+
+  /* Panel: opacity + displacement. `:first-child` is the panel in every
+     overlay in `src/` — checked one by one; none of them nests a separate
+     scrim element inside, because the scrim IS the overlay. */
+  .u-modal-shell:has(> *) > *:first-child:not([aria-hidden="true"]) {
+    transition: opacity var(--dur-move) var(--ease-out-expo),
+                transform var(--dur-move) var(--ease-out-expo);
+  }
+
+  @starting-style {
+    .u-modal-shell:has(> *):not([aria-hidden="true"]) {
+      opacity: 0;
+    }
+    .u-modal-shell:has(> *) > *:first-child:not([aria-hidden="true"]) {
+      opacity: 0;
+      transform: translateY(12px) scale(.97);
+    }
+  }
+
+  /* ── EXIT ────────────────────────────────────────────────────────────
+     Added 2026-09-28 with `useOverlayPresence` ("Tingkat 2").
+
+     `@starting-style` above gives the ENTRY and nothing else: it declares the
+     state an element starts from on its first render. Exit is a different
+     mechanism — the element must SURVIVE while its computed style changes, and
+     the hook marks it with `data-closing="true"` for exactly that window.
+
+     WHY THE PARENT HAS TO COOPERATE. These overlays are conditionally
+     rendered, so the node is removed on the same frame the state flips and
+     there is nothing left to animate. `useOverlayPresence` keeps it mounted
+     for `OVERLAY_EXIT_MS` (240 ms); this block animates it out during that
+     window. Neither half works alone.
+
+     EXIT IS FASTER THAN ENTRY, AND THAT IS THE POINT. Enter uses
+     `--dur-move` (320 ms) for the panel because it is a displacement the user
+     is waiting to see. Exit drops to `--dur-hover` (180 ms) for both scrim and
+     panel: the user already knows what is on screen and is waiting for the
+     tool to get out of the way. Holding the exit for the entry's duration
+     makes the app feel slow on its most-repeated action. No new duration token
+     is introduced — 180 ms is the repo's existing `hover` step.
+
+     SPECIFICITY IS LOAD-BEARING. `[data-closing="true"]` adds (0,1,0), so
+     these rules outrank the entry rules above without `!important`. And
+     `transition-duration` is written as its own declaration rather than
+     re-stating the shorthand, so the easing and property list cannot drift
+     apart from the entry block.
+
+     RE-OPENING MID-EXIT IS HANDLED FOR FREE: removing `data-closing` drops
+     these rules, the entry rules apply again, and the panel eases back to
+     opacity 1 from wherever it had got to — a bounce-back, not a jump. */
+  .u-modal-shell[data-closing='true']:has(> *):not([aria-hidden='true']) {
+    opacity: 0;
+    transition-duration: var(--dur-hover);
+  }
+  .u-modal-shell[data-closing='true']:has(> *) > *:first-child:not([aria-hidden='true']) {
+    opacity: 0;
+    transform: translateY(12px) scale(.97);
+    transition-duration: var(--dur-hover);
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   9. ENTRANCE — ubin & kartu masuk sekali
+   ══════════════════════════════════════════════════════════════════
+
+   The last unbuilt item in docs/ILLUSTRATION_SPEC.md §6.1 ("Animasi
+   masuk untuk ubin & kartu", scope: CSS only, risk: low).
+
+   THE FAILURE THIS IS BUILT AROUND — AND IT IS NOT THE ANIMATION
+   --------------------------------------------------------------
+   Every naive entrance animation has the same defect, and it is the one
+   the marquee at the top of this file already carries a long comment
+   about: **CSS runs the animation whether or not the element is on
+   screen.** A card 4000px down the page "enters" while nobody is
+   looking, so the visitor scrolls to it and finds it already settled —
+   the effect costs a paint and delivers nothing. Worse, `both` fill
+   mode leaves it at the START frame until the animation actually runs,
+   so a page whose animation never fires shows nothing at all.
+
+   So there are TWO parts, and the CSS is the smaller one:
+
+     1. THE CSS HERE — the keyframe and the hidden start state.
+     2. A TINY SCRIPT (`Reveal.astro`) that adds `is-revealed` when the
+        element actually crosses into the viewport, via
+        IntersectionObserver — the same primitive `SiteNav.astro` uses
+        for its active-section band.
+
+   THE NO-JAVAXS-NO-ANIMATION RULE
+   ------------------------------
+   The hidden state is applied ONLY under `html.js-reveal`, a class the
+   script sets before first paint. Without JavaScript the selector never
+   matches, every card is simply visible and still. This inverts the
+   usual arrangement (animate by default, opt out) because the default
+   has to be the one that cannot break: **content that is readable
+   always beats content that animates.**
+
+   ANTI-FLASH: THE OBSERVER IS SET UP IN THE SAME INLINE SCRIPT
+   -----------------------------------------------------------
+   `html.js-reveal` is added in an inline `<head>`-time script, so no
+   frame can render the pre-hidden state with JS already known to be on.
+   The alternative — a deferred module that adds the class on
+   DOMContentLoaded — flashes every card visible and then snaps it
+   hidden, which is a worse artefact than no animation at all.
+
+   STAGGER
+   -------
+   A grid where every tile moves at once reads as a twitch; the same
+   grid offset by 60ms per tile reads as a cascade. The index comes from
+   `--reveal-i` on each element (set by the caller, or by `nth-child`
+   below for the plain cases) clamped to a cap — 8 steps × 60ms = 480ms
+   maximum, so a 200-row table cannot turn into a 12-second performance.
+
+   WHY THE CAP IS NOT OPTIONAL
+   ---------------------------
+   Without it, stagger is a function of list LENGTH, and this app has a
+   159-row job table. `--reveal-i` is clamped by `min()` below, so row
+   150 and row 8 start together. The stagger communicates "these arrived
+   as a group"; past the first screenful it communicates nothing and
+   costs 12s of waiting for the last row.
+
+   WHY NO `will-change` HERE
+   -------------------------
+   This is the one animation in the file that runs EXACTLY ONCE and then
+   never again. `will-change` on a few hundred tiles would pin a few
+   hundred compositor layers for the life of the page — the exact
+   anti-pattern the header of this file warns about. The animation is
+   short and off the critical path; a single mid-animation promotion is
+   cheaper than the layers.
+   ------------------------------------------------------------------ */
+
+:root {
+  /* Per-item offset. Was 60ms; raised to 90ms on 2026-09-26 after checking
+     the guidance: Framer's scroll-animation guide puts the readable stagger
+     band at **0.08–0.12s** per card, and 60ms sits BELOW it — the items
+     arrived so close together that the cascade read as one block appearing,
+     which is most of why the page felt stiff despite animating. */
+  --reveal-step: 90ms;
+  /* How many items may stagger before the rest join in. See the cap note. */
+  --reveal-max-steps: 8;
+  /* Distance travelled. Was 12px. 12px is enough to read as "up" but only
+     just — at a glance the card looks like it simply appeared. 16px still
+     cannot be mistaken for a card flying in from off-screen, and it is the
+     same order as the section shift below so the two scales agree. */
+  --reveal-shift: 16px;
+  --reveal-dur: 480ms;
+}
+
+@keyframes reveal-rise {
+  from { opacity: 0; transform: translate3d(0, var(--reveal-shift), 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* ── The hidden start state. ONLY when JS has confirmed it is running. ──
+   `both` is deliberate: the element must hold the `from` frame during its
+   stagger delay, or every item would flash visible and then re-hide. */
+html.js-reveal [data-reveal]:not(.is-revealed) {
+  opacity: 0;
+  transform: translate3d(0, var(--reveal-shift), 0);
+}
+
+html.js-reveal [data-reveal].is-revealed {
+  animation: reveal-rise var(--reveal-dur) var(--ease-out-expo) both;
+  /* Clamped: see "WHY THE CAP IS NOT OPTIONAL". `min()` needs a length or a
+     time on both sides, so the cap is expressed as a step COUNT times the
+     step duration — invalid values would drop the whole declaration. */
+  animation-delay: calc(
+    min(var(--reveal-i, 0), var(--reveal-max-steps)) * var(--reveal-step)
+  );
+}
+
+/* ── Default stagger for plain grids, so a caller need not annotate each
+      child. `-1` on the first child would be an invalid negative delay
+      only in appearance; `nth-child` starts at 1 so `--reveal-i` is 0-based
+      from the FIRST child, which is what we want.
+
+      Scoped to `[data-reveal-stagger]` so this never leaks onto a list
+      whose children are not cards. */
+html.js-reveal [data-reveal-stagger] > [data-reveal]:nth-child(1) { --reveal-i: 0; }
+html.js-reveal [data-reveal-stagger] > [data-reveal]:nth-child(2) { --reveal-i: 1; }
+html.js-reveal [data-reveal-stagger] > [data-reveal]:nth-child(3) { --reveal-i: 2; }
+html.js-reveal [data-reveal-stagger] > [data-reveal]:nth-child(4) { --reveal-i: 3; }
+html.js-reveal [data-reveal-stagger] > [data-reveal]:nth-child(5) { --reveal-i: 4; }
+html.js-reveal [data-reveal-stagger] > [data-reveal]:nth-child(6) { --reveal-i: 5; }
+html.js-reveal [data-reveal-stagger] > [data-reveal]:nth-child(n + 7) { --reveal-i: 6; }
+
+/* ── Reduced motion. Same trap as the marquee above, same fix: the `*` clamp
+      in global.css would set this animation's duration to 0.01ms and, with
+      `both` fill, leave some items pinned at the `from` frame — opacity 0.
+      A visitor who asked for less motion would get MISSING CARDS.
+
+      So the hidden state is removed outright rather than shortened, and the
+      reset is written WITHOUT `!important` even though it would be the easy
+      way out. Two reasons, and the second is the one that matters:
+
+        1. `!important` here would reverse the cascade for every later rule
+           that tries to style these elements — the exact debt
+           `lint/complexity/noImportantStyles` exists to catch.
+
+        2. It is not needed, and adding it would HIDE the reason it is not
+           needed. The reset wins on SPECIFICITY instead: the hidden rule
+           above is `html.js-reveal [data-reveal]:not(.is-revealed)` (0,2,1
+           plus the :not argument), and this block repeats that element
+           shape while adding the reduced-motion media query — which is
+           itself part of the cascade. No `!important`, no source-order
+           gamble, and if someone later adds an equally specific rule the
+           conflict shows up as a real specificity question instead of being
+           silently beaten by an `!important` that was only ever defensive.
+
+      `:not(.is-revealed)` appears in BOTH branches so the reset cannot be
+      outranked by the hidden rule in the branch where the element has not
+      been revealed yet — which is precisely the case that would render an
+      invisible card. */
+@media (prefers-reduced-motion: reduce) {
+  html.js-reveal [data-reveal]:not(.is-revealed),
+  html.js-reveal [data-reveal].is-revealed {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   9b. SECTION ENTRANCES — every band arrives its own way
+   ══════════════════════════════════════════════════════════════════
+
+   OWNER'S REQUEST, verbatim, because it is the spec:
+     "tiap bagian kek layanan, hero, galery, contacu us tolong setiap
+      scrollnya bikin transisi beda beda"
+
+   WHY THESE ARE SEPARATE FROM §9 (`reveal-rise`)
+   ----------------------------------------------
+   §9 animates the ITEMS inside a section — every card, tile and row.
+   This block animates the SECTION ITSELF, once, as a band. They are
+   different scales and they compose: a section can slide in while its
+   cards cascade inside it. Collapsing the two would have meant one
+   animation doing both jobs, which is how a page ends up with every band
+   moving identically.
+
+   WHY `data-enter` AND NOT SEVEN CLASSES
+   --------------------------------------
+   The kind is chosen in `src/lib/sectionMotion.ts` (one table, shared
+   with the test), and each section writes it as an attribute. That keeps
+   the HTML honest — you can read a section's entrance without opening the
+   stylesheet — and it means the vocabulary lives in one file that can be
+   asserted, rather than seven classes a linter cannot count.
+
+   THE HIDDEN START STATE, AND THE ONE THING THAT MUST NOT HAPPEN
+   --------------------------------------------------------------
+   Same rule as §9, and it is the whole reason this is written the hard
+   way: the start state is HIDDEN (opacity 0, displaced) and is applied
+   ONLY under `html.js-reveal`. With scripting off the attribute matches no
+   rule and every band is simply present. Content that is readable always
+   beats content that animates.
+
+   ⚠ AND THE SAME TRAP AS §9's REDUCED-MOTION BLOCK: every rule here uses
+   `both` fill, so the start frame IS `opacity: 0`. A visitor who asked for
+   less motion must therefore get the animation REMOVED, not shortened — a
+   clamped duration would leave the band pinned at the invisible frame.
+   See the reduced-motion block at the end of this section.
+
+   WHY `transform`/`opacity`/`clip-path` ONLY
+   ------------------------------------------
+   All three are compositor or cheap-paint properties. None triggers a
+   layout pass, which matters more here than in §9: a section is a large
+   subtree, so animating `margin` or `height` on one would relayout the
+   page on every frame.
+   ------------------------------------------------------------------ */
+
+:root {
+  /* Section entrances travel further than §9's 12px: a band moving 24px
+     reads as the band arriving, where 12px at this size reads as a twitch.
+     Kept modest because a section is big — a large displacement on a
+     full-width element looks like the page is sliding apart. */
+  --enter-shift: 24px;
+  --enter-dur: 620ms;
+  /* Slightly longer and softer than §9's curve. A section is a big object;
+     the same easing that flatters a card makes a band feel abrupt. */
+  --enter-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes enter-rise {
+  from { opacity: 0; transform: translate3d(0, var(--enter-shift), 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes enter-slide-left {
+  from { opacity: 0; transform: translate3d(calc(var(--enter-shift) * -2), 0, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes enter-slide-right {
+  from { opacity: 0; transform: translate3d(calc(var(--enter-shift) * 2), 0, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* Grows from 94% — the "opening" read. Paired with a grid it looks like
+   the tiles are pushing the band open. */
+@keyframes enter-grow {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* The curtain: the content is CLIPPED to nothing at the top and the clip
+   retracts upward, so the band appears to be revealed from beneath its own
+   top edge rather than sliding in from outside. `inset()` rather than a
+   translate because the point is the wipe, not the movement.
+
+   `clip-path` is animated here and NOT in the reduced-motion path (below),
+   where it is reset to `none` — a leftover `inset(0 0 100% 0)` on a still
+   band would hide it, which is the §9 opacity trap in a different costume. */
+@keyframes enter-curtain {
+  from { opacity: 0; clip-path: inset(0 0 100% 0); }
+  to   { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+
+@keyframes enter-drop {
+  from { opacity: 0; transform: translate3d(0, calc(var(--enter-shift) * -1.5), 0) scale(0.98); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+/* Focus: starts soft and slightly oversized, sharpens as it lands. The blur
+   is small (3px) and short-lived on purpose — a large blur on a full-width
+   band is a genuinely expensive paint on a weak GPU, and it reads as a
+   rendering fault rather than as an entrance. */
+@keyframes enter-focus {
+  from { opacity: 0; filter: blur(3px); transform: scale(1.015); }
+  to   { opacity: 1; filter: blur(0); transform: scale(1); }
+}
+
+/* ── The hidden start state, gated on the JS flag, exactly like §9. ──
+      One selector per kind so the `from` frame of that kind's own keyframe
+      applies; a single shared `transform` here would produce a jump for the
+      kinds whose first frame is a scale.
+
+      DELIBERATELY NO PRE-STATE CLIP FOR `curtain`. The shared `opacity: 0`
+      below is the ONLY thing that hides a curtain band before its reveal. A
+      pre-state `clip-path: inset(0 0 100% 0)` here (which this block used to
+      carry) is REDUNDANT for hiding — `opacity: 0` already hides the band, and
+      the band still wipes in correctly with or without the clip — but it is
+      ACTIVELY HARMFUL for one reason, measured: it breaks the section-nav
+      scroll-spy.
+
+      WHY, precisely: `clip-path: inset(0 0 100% 0)` collapses the element's
+      intersection to a ZERO-HEIGHT LINE at its TOP edge, and a band only sees
+      the element while that line falls inside the band. The reveal band
+      (`0px 0px -12% 0px`) is tall, so it catches the line across a wide scroll
+      range and the band reveals normally. The spy band
+      (`-56px 0px -70% 0px`) is a thin strip near the top of the viewport, so
+      once the section is scrolled to the top — exactly the position
+      `e2e/test-site-nav.mjs` puts it in — the line falls outside the strip and
+      the section is never marked current. Measured: with the clip that suite
+      went 7/8 (one check fails, covering both `#alur` and `#tentang`,
+      "marked=[]"); without it, 8/8.
+
+      The wipe is fully preserved either way: the `enter-curtain` keyframe's
+      `from` frame re-applies the clip the instant `.is-entered` lands
+      (fill-mode `both`), so it retracts from fully clipped exactly as before.
+      Do NOT re-add a clip here. */
+html.js-reveal [data-enter]:not(.is-entered) { opacity: 0; }
+
+html.js-reveal [data-enter="rise"]:not(.is-entered)         { transform: translate3d(0, var(--enter-shift), 0); }
+html.js-reveal [data-enter="slide-left"]:not(.is-entered)  { transform: translate3d(calc(var(--enter-shift) * -2), 0, 0); }
+html.js-reveal [data-enter="slide-right"]:not(.is-entered) { transform: translate3d(calc(var(--enter-shift) * 2), 0, 0); }
+html.js-reveal [data-enter="grow"]:not(.is-entered)        { transform: scale(0.94); }
+html.js-reveal [data-enter="drop"]:not(.is-entered)        { transform: translate3d(0, calc(var(--enter-shift) * -1.5), 0) scale(0.98); }
+html.js-reveal [data-enter="focus"]:not(.is-entered)       { filter: blur(3px); transform: scale(1.015); }
+
+/* ── The running state. `both` holds the `from` frame through the delay,
+      so a band cannot flash in before its turn. */
+html.js-reveal [data-enter].is-entered { animation-duration: var(--enter-dur); animation-timing-function: var(--enter-ease); animation-fill-mode: both; }
+
+html.js-reveal [data-enter="rise"].is-entered         { animation-name: enter-rise; }
+html.js-reveal [data-enter="slide-left"].is-entered   { animation-name: enter-slide-left; }
+html.js-reveal [data-enter="slide-right"].is-entered  { animation-name: enter-slide-right; }
+html.js-reveal [data-enter="grow"].is-entered         { animation-name: enter-grow; }
+html.js-reveal [data-enter="curtain"].is-entered      { animation-name: enter-curtain; }
+html.js-reveal [data-enter="drop"].is-entered         { animation-name: enter-drop; }
+html.js-reveal [data-enter="focus"].is-entered        { animation-name: enter-focus; }
+
+/* ── Reduced motion: REMOVE the entrance, do not shorten it. ──
+      Same specificity reasoning as §9 (`:not(...)` in both branches, no
+      `!important`), and `clip-path`/`filter` are reset explicitly because a
+      shortened `enter-curtain` would leave the band clipped to nothing and a
+      shortened `enter-focus` would leave it blurred — two ways to hide
+      content from the visitor who asked for LESS motion. */
+@media (prefers-reduced-motion: reduce) {
+  html.js-reveal [data-enter]:not(.is-entered),
+  html.js-reveal [data-enter].is-entered {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    clip-path: none;
+    filter: none;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   9c. INTERACTIVE STATES — hover, press, and the three recipes
+   ══════════════════════════════════════════════════════════════════
+
+   OWNER'S REQUEST, verbatim, because it is the spec:
+     "buatkan halaman company profile yang lebih interaktif dan tidak
+      monoton dengan menerapkan CSS Transition Property ... efek transisi
+      pada elemen seperti hover tombol, navigasi, kartu layanan, dan gambar,
+      serta tentukan durasi, timing function, dan properti yang dianimasikan
+      agar pergerakannya mulus dan konsisten di seluruh halaman"
+
+   §9 and §9b are SCROLL-driven: they fire once, when a band or an item
+   enters the viewport. This section is POINTER-driven: it fires every time
+   the visitor points at something. Different trigger, different budget —
+   a scroll entrance is watched once and can afford 480ms, while a hover
+   that takes 480ms feels broken because the pointer is still moving.
+
+   WHY ONE RECIPE PER THING THAT MOVES, AND NOT ONE PER COMPONENT
+   -------------------------------------------------------------
+   MEASURED 2026-09-26, before this block: the public components carried
+   five different hover speeds — 200ms (ClosingBand), 300ms (the service
+   cards), 500ms (the gallery), 700ms (the service banners) and the 180ms
+   default. So a service card lifted over 300ms while the button inside it
+   answered in 180ms, and the card felt slower than its own contents. The
+   duration scale in theme.css now names the four steps; these three
+   classes are how a call site picks one without inventing a fifth.
+
+     .u-lift   a surface that comes toward the pointer — cards, tiles.
+     .u-zoom   an image inside a clipped frame — galleries, banners.
+     .u-press  a control acknowledging a press.
+
+   ANIMATED PROPERTIES: transform, border-color, opacity. transform and
+   opacity are compositor-only. border-color is not, but at 180ms a single
+   repaint is cheaper than promoting a layer for the life of the element.
+
+   NO `will-change`, NO translate3d() — the same reasoning §5 already
+   records for the reveal animations: a one-shot tween is promoted by the
+   browser automatically, and forcing a layer would cost memory on every
+   card in a 20-card grid for no gain.
+
+   NO BOX-SHADOW, deliberately. Card.astro records the ruling: on a dark
+   canvas a drop shadow is nearly invisible, which is exactly why the old
+   `shadow-2xl` cards read as boxes floating with no edge. Depth on hover
+   is carried by the BORDER brightening, the same way Card carries it at
+   rest. That also means one fewer token to keep in sync between themes.
+
+   THE RECIPE OWNS THE TIMING **AND THE HOVER BORDER COLOUR**, and that second
+   half is not a style preference — it is forced by the cascade.
+
+   MEASURED 2026-09-26: `hover:border-emerald-500/70` on a service card did
+   NOTHING in light theme. The card's border stayed `rgb(110,231,183)` on hover
+   while `:hover` was confirmed matching and the transform fired. Cause: this
+   repo's light-theme shims (`global.css` §"emerald/sky/amber") are UNLAYERED,
+   and Tailwind's utilities live in `@layer utilities`. **An unlayered rule
+   beats a layered one regardless of specificity**, so
+   `:where([data-theme="light"]) :is(.border-emerald-500\/40, …)` (0,1,0,
+   unlayered) defeats `.hover\:border-emerald-500\/70:hover` (0,2,0, layered).
+   The shim list stops at `/60`, so `/70` was never shimmed and could never win.
+
+   So the hover colour is set HERE, unlayered, from a custom property the call
+   site supplies — the same pattern Card.astro already uses for `--reveal-i`.
+   Use the THEME-AWARE accent tokens (`--color-accent-emerald` and friends),
+   which are already remapped per theme, rather than a raw palette step.
+
+   TOUCH DEVICES: `:hover` on a touch screen sticks after a tap, so a card
+   would stay lifted. `@media (hover: hover)` gates the lift to pointers
+   that can actually hover; the press state below is what a finger gets.  */
+
+@media (hover: hover) {
+  .u-lift {
+    /* Overridable per call site; the neutral emphasis a plain Card uses. */
+    --u-lift-border: var(--color-line-strong);
+    transition:
+      transform        var(--dur-move)  var(--ease-out-expo),
+      border-color     var(--dur-hover) var(--ease-out-expo),
+      background-color var(--dur-hover) var(--ease-out-expo);
+  }
+  .u-lift:hover {
+    transform: translateY(-4px);
+    border-color: var(--u-lift-border);
+  }
+
+  .u-zoom {
+    transition: transform var(--dur-image) var(--ease-out-expo);
+  }
+  /* Keyed off the caller's own `group` class rather than a new wrapper, so an
+     image can be zoomed by any ancestor the caller already marks. */
+  .group:hover .u-zoom {
+    transform: scale(1.05);
+  }
+}
+
+/* Press is pointer-independent: a finger needs it as much as a mouse. The
+   spring curve is the one §6 reserves for direct manipulation. */
+.u-press {
+  transition: transform var(--dur-press) var(--ease-spring);
+}
+.u-press:active {
+  transform: translateY(1px);
+}
+
+/* REDUCED MOTION — explicit, because the global clamp in global.css only
+   shortens `transition-duration` to 0.01ms. That makes the transition
+   instant but does NOT stop the transform, so a card would still JUMP 4px
+   the moment the pointer crossed it — a sudden displacement, which is worse
+   for a motion-sensitive visitor than the smooth move it replaced. So the
+   movement is removed here and the COLOUR affordance is kept: the border
+   still brightens, because a colour change is not motion and it is the only
+   cue left that the card is interactive. */
+@media (prefers-reduced-motion: reduce) {
+  .u-lift {
+    transition: border-color var(--dur-hover) var(--ease-out-expo);
+  }
+  .u-lift:hover,
+  .u-lift:active {
+    transform: none;
+  }
+  .u-zoom,
+  .group:hover .u-zoom {
+    transition: none;
+    transform: none;
+  }
+  .u-press,
+  .u-press:active {
+    transition: none;
+    transform: none;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   9d. SCROLL-LINKED DRIFT — the page’s two decorative banners
+   ══════════════════════════════════════════════════════════════════
+
+   OWNER’S REQUEST, verbatim, because it is the spec:
+     "maunya kek scroll fade in ou motion atas bawah dan lain lain gitu
+      di web web terbaru yg trend"
+
+   §9 and §9b already answer the "fade in" half: they fire ONCE, when a
+   card or a band crosses into the viewport. What they cannot do is move
+   WITH the scroll. A one-shot entrance is over before the visitor is
+   looking at it, so a page built only from one-shot entrances reads as a
+   series of arrivals rather than as one surface moving. This block is the
+   missing half: motion whose VALUE is a function of scroll position, so
+   it is continuous, and reversible — scroll back up and it runs backwards.
+
+   ── SCOPE: TWO PHOTOGRAPHS, NOT TWENTY-FOUR ─────────────────────────
+   MotionKit’s 2026 trend review is blunt about this, and it is why this
+   block is small: "autoplaying entrance animations on everything reads as
+   dated". Restraint, not quantity. The layer therefore touches exactly
+   the images that satisfy ALL THREE of:
+
+     1. large enough for a drift to read as depth at all — a 200px tile
+        moving 30px is a twitch, not parallax;
+     2. PURELY DECORATIVE, i.e. `alt="" aria-hidden="true"`, so the 12%
+        vertical over-size the drift needs cannot cut a person out of the
+        frame;
+     3. NO POINTER AFFORDANCE. This is the hard constraint, and it is
+        measured rather than assumed: `.u-zoom` (§9c) animates `transform`
+        with a TRANSITION, and a CSS *animation* on the same property of
+        the same element OVERRIDES the transition outright — the hover
+        zoom would stop working and nothing would report it. Every gallery
+        tile, facility illustration and service banner carries `.u-zoom`,
+        so none of them may take a scroll-linked `transform` on its image.
+
+   What survives all three tests is the two banner photographs: the
+   `#penempatan` and `#lokasi` bands. The other ~22 images on the page are
+   excluded by rule 3, not by taste. Both halves of that claim were
+   measured in a real browser before this shipped: the drift changes value
+   across scroll offsets, and a gallery tile’s `.u-zoom` hover zoom still
+   reaches `scale(1.05)` afterwards.
+
+   ── WHY THE FRAME IS `overflow: clip` AND NOT `overflow: hidden` ────
+   MEASURED, and it is the one thing here that would have failed SILENTLY.
+   `animation-timeline: view()` resolves against the SUBJECT’s nearest
+   SCROLL CONTAINER. `overflow: hidden` ESTABLISHES one — that is the only
+   difference between it and `clip` — so with `hidden` the photograph’s
+   scrollport would be its own frame, a box it never moves relative to. The
+   timeline’s progress would then be pinned, and the drift would sit frozen
+   at one offset while the stylesheet looked perfectly correct.
+
+   `clip` clips exactly the same pixels and creates no scroll container, so
+   the subject’s scroll container stays the document and the timeline tracks
+   the page. Measured both ways: with `clip` the computed transform changes
+   across scroll offsets; with `hidden` injected the same read is constant.
+   This is the same distinction `index.astro` already records for the
+   `overflow-x-clip` on <main> — `clip` is the tool that clips without
+   making a scroll container, and here that property is load-bearing twice.
+
+   ── AND YET `hidden` IS DECLARED TOO, AS A FALLBACK ─────────────────
+   Not a contradiction. `overflow: clip` is not recognised by Safari ≤15, and
+   an unsupported VALUE is dropped at parse time — so there the frame would
+   fall back to `visible` and the over-sized photograph (`height: 114%; top:
+   -7%`) would spill ~7% past the rounded corner. So the frame needs a
+   `hidden` fallback for exactly those browsers.
+
+   IT MUST BE WRITTEN AS ITS OWN `@supports not (overflow: clip)` BLOCK, NOT
+   AS A SECOND DECLARATION IN `.u-drift-frame`. This is not style preference:
+   `lightningcss` collapses a duplicate property in one block and keeps only
+   the LAST one, so the two-declaration form ships with the fallback missing.
+   Measured on this toolchain — see the comment at the block itself, which
+   records the exact experiment. The `@supports` form survives the minifier
+   byte-identical.
+
+   The fallback cannot re-freeze the timeline, because in exactly those
+   browsers `animation-timeline: view()` is unsupported too — there is no
+   scroll timeline for a scroll container to pin. The two are only ever in
+   force apart, which is why the fallback is safe as well as necessary.
+
+   ── THE OVER-SIZE, AND WHY IT IS 6% ────────────────────────────────
+   A photograph drifting inside a fixed frame exposes an edge the moment it
+   travels further than the slack around it. So the image is 114% of the
+   frame’s height — 7% above and 7% below — and the drift is ±3.5% of the
+   IMAGE’s own height, i.e. 3.99% of the frame, which leaves ~3% of margin
+   on each side. It is expressed as a share rather than in px so it scales:
+   ≈32px each way on the desktop banner (≈64px across the whole range,
+   inside the 40–80px band Framer’s guide calls readable) and ≈9px on a
+   phone, where the same absolute travel would look violent.
+
+   ── PROGRESSIVE ENHANCEMENT, NEVER A HALF-APPLIED LAYER ─────────────
+   Everything that makes the banner MOVE lives inside `@supports
+   (animation-timeline: view())`. Without support the frame still has its
+   `aspect-ratio` and its `overflow: hidden`/`clip` pair, and the image is
+   still the same photograph 7% larger on each side — the band renders as a
+   still image, which is the correct degradation. Only the rules that make it
+   move are inside the `@supports`; the rules that make it LOOK right are
+   outside. That split is also why the fallback above belongs OUTSIDE the
+   `@supports`: clipping is a looks-right concern, not a moves concern.
+   ------------------------------------------------------------------ */
+
+.u-drift-frame {
+  /* The frame is the clip, and it is the half that never moves — only the
+     photograph inside it does. `clip`, not `hidden`: see the note above,
+     this is load-bearing for the timeline. */
+  position: relative;
+  overflow: clip;
+}
+
+/* THE FALLBACK FOR BROWSERS THAT DO NOT KNOW `overflow: clip` (Safari ≤15).
+   DO NOT FOLD THIS INTO THE RULE ABOVE — it would be deleted, silently.
+
+   Written as two declarations in one block —
+     `.u-drift-frame { overflow: hidden; overflow: clip; }`
+   — it looks correct in source and is NOT what ships: `lightningcss`
+   collapses the duplicate property and keeps only `overflow: clip`. Measured
+   on this toolchain with `minify: true` — and it does so even when handed
+   `targets: { safari: 15 }`, i.e. while being explicitly told the target
+   cannot parse `clip`. Two bare rules are merged the same way. The built
+   bytes then contain `clip` alone, so on Safari ≤15 the declaration is
+   dropped, the frame falls back to `visible`, and the over-sized image
+   (`height: 114%; top: -7%`) spills ~7% past the rounded corner: source
+   looks fixed, production is not.
+
+   A separate `@supports` block is the form that survives the minifier —
+   measured, it passes through byte-identical. It cannot re-freeze the
+   timeline: in exactly these browsers `animation-timeline: view()` is
+   unsupported too, so there is no scroll timeline for `hidden`'s scroll
+   container to pin. The two are only ever in force apart, which is why the
+   fallback is safe as well as necessary. */
+@supports not (overflow: clip) {
+  .u-drift-frame {
+    overflow: hidden;
+  }
+}
+
+.u-drift-frame > img {
+  /* Positioned and over-sized so the drift can never expose an edge.
+     `height: 114%` resolves against the frame, whose height is definite
+     because `aspect-ratio` plus a definite width determines it. */
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -7%;
+  width: 100%;
+  height: 114%;
+  object-fit: cover;
+}
+
+@keyframes drift-lag {
+  /* From above the rest position to below it: as the band rises up the
+     screen the photograph slides DOWN inside it, so it travels less than
+     the frame does. That lag is what reads as "further away". */
+  from { transform: translate3d(0, calc(var(--drift) * -1), 0); }
+  to   { transform: translate3d(0, var(--drift), 0); }
+}
+
+@supports (animation-timeline: view()) {
+  .u-drift {
+    /* Travel, as a share of the photograph’s OWN height. See the note on
+       the 7% over-size: 3.5% here is 3.99% of the frame, leaving 3%. */
+    --drift: 3.5%;
+    animation: drift-lag linear both;
+    /* `auto` is REQUIRED — a time value is meaningless against a scroll
+       timeline — and it must come AFTER the shorthand, which resets it. */
+    animation-duration: auto;
+    /* And so must this: the `animation` shorthand resets
+       `animation-timeline` to `auto`, i.e. the document timeline, which
+       would run the drift once on load over zero scroll distance. The
+       order of these three declarations is the whole point of the block. */
+    animation-timeline: view();
+    /* Starts once a quarter of the band has come into view, finishes when
+       the band’s top reaches the viewport top. Ranges are derived from the
+       UNTRANSFORMED box, so the drift cannot feed back into its own range
+       and oscillate. */
+    animation-range: entry 25% cover 50%;
+  }
+}
+
+/* Reduced motion: REMOVE the layer, do not shorten it. Same trap as §9 and
+   §9b in its own costume — the global clamp in global.css only shortens
+   `animation-duration`, and on a scroll timeline a shortened duration does
+   not mean "less movement", it means the photograph is left parked at
+   whatever fraction of the drift the clamp lands on. So the animation is
+   removed outright and `transform` is reset to `none`, which is the static
+   position and is still fully covered by the 7% over-size. Specificity is
+   equal to the `@supports` rule above and this block comes later, so no
+   `!important` is needed — the same reasoning §9 records at length. */
+@media (prefers-reduced-motion: reduce) {
+  .u-drift {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   9e. HERO PARALLAX — the landing band's layers drift at different speeds
+   ══════════════════════════════════════════════════════════════════
+
+   OWNER'S REQUEST, verbatim, because it is the spec:
+     a YouTube Short — "SMOOTH SCROLL DOWN ANIMATED WEBSITE DESIGN" —
+     full-screen illustrated hero, huge serif display headline, pill CTA,
+     scroll-driven transitions — and: "can't we make something like this?"
+
+   §9d is the same primitive one band down the page, and this block follows
+   it line for line. READ §9d FIRST: the `overflow: clip`-not-`hidden`
+   finding, the `lightningcss` fallback finding, and the reduced-motion
+   finding all apply here unchanged, and none of them are repeated in full
+   below.
+
+   ── WHAT MOVES, AND WHY THERE ARE ONLY TWO MOVING PLANES ────────────
+   A parallax needs planes at different DISTANCES. The honest constraint
+   here is that the hero artwork is ONE raster (`hero-sakura.avif`) — a
+   generated 2.75:1 banner with the sky, Fuji, the pagoda and the figure
+   already composited into it. It cannot be taken apart without new source
+   art, so two planes are built from what exists:
+
+     1. `.hero-art`  — the raster itself. The FAR plane: it travels
+        least, so it reads as the distant scene. `--parallax: 4%`.
+     2. `.hero-haze` — a second copy of the band's own `--hero-glow` token,
+        repositioned and scaled up, drifting the other way and further.
+        The NEAR plane: it travels most, so it reads as atmosphere close to
+        the camera sliding over the scene. `--parallax: -11%`.
+
+   ── WHY THE HAZE TRAVELS FURTHER, AND THE OTHER WAY ────────────────
+   `.hero-haze` moves roughly 2.75x as far as the artwork and in the
+   opposite direction (measured: +38.05px vs -104.63px over the scroll
+   range). The DEPTH cue is the DIFFERENCE IN RATE — a plane that
+   travels further reads as closer to the camera. Opposite direction is
+   not the principle; two planes moving the same way at different speeds
+   is the textbook parallax and would read as depth too.
+
+   What the opposite direction buys here is narrower than "depth", and
+   it is worth stating honestly rather than dressing it as a rule: it
+   makes the two layers visibly INDEPENDENT rather than a single field
+   sliding at one rate with a smeared second edge. This is an aesthetic
+   choice, not a law of perception, and it is reversible on its own
+   without touching the rate difference above. ──────────────────────
+
+   ── WHAT IS DELIBERATELY *NOT* A PLANE ─────────────────────────────
+   THE HERO COPY DOES NOT MOVE. The headline block is at the bottom-left
+   and carries `backdrop-blur-sm` on its CTA and its three stat tiles;
+   translating a subtree of blurred surfaces forces the browser to re-run
+   every backdrop blur on every frame, which is the single most expensive
+   thing this page could do while scrolling. It would also move the text
+   under the `e2e/test-landing.mjs` visibility probe, which reads
+   `getBoundingClientRect()`.
+
+   THE `.header-overlay` SCRIM DOES NOT MOVE EITHER. It is the layer that
+   carries the headline's contrast against the artwork (global.css §5d,
+   `e2e/measure-hero-contrast.mjs`). A scrim that drifts is a scrim whose
+   contrast varies with scroll position — the one property that must not
+   change. It stays where it is.
+
+   The haze is therefore placed in the UPPER-RIGHT, away from the copy:
+   `background-position: 80% 30%`. A pink bloom behind a white headline
+   would raise the backdrop's luminance and eat exactly the contrast the
+   scrim exists to protect, and the drift would carry it in and out of the
+   copy's row across the scroll range.
+
+   ── THE OVER-SIZE ──────────────────────────────────────────────────
+   Same arithmetic as §9d. A plane drifting inside a fixed frame exposes an
+   edge the moment it travels further than the slack around it, so each
+   plane is 116% of the band's height with 8% overhanging above and below,
+   and the largest travel (11% of the plane's own height = 12.76% of the
+   band) stays inside that slack. Percentages, not px, so the travel scales:
+   ≈105px total on an 820px-tall desktop band, ≈75px on a phone — both
+   inside the 40–80px band Framer's guide calls readable, the desktop one
+   at the top of it because the band is the full screen.
+
+   ── RANGES ─────────────────────────────────────────────────────────
+   `animation-range: cover 0% cover 100%`. On the landing route the band
+   starts at the very top of the document, so the first half of the cover
+   range (the band entering from below) is never reached and the drift
+   begins at its neutral position at scroll 0 and completes as the band
+   leaves the screen. Ranges are derived from the UNTRANSFORMED box, so the
+   drift cannot feed back into its own range and oscillate.
+
+   ── GATING, AND WHY THE FALLBACK IS INERT ──────────────────────────
+   Everything that makes a plane MOVE lives inside `@supports
+   (animation-timeline: view())` AND `@media (prefers-reduced-motion:
+   no-preference)`. Everything that makes it LOOK right — the geometry and
+   the over-size — lives outside. Without support, or under reduce-motion,
+   each plane is a still layer at its natural position, fully covered by
+   its own over-size, clipped by `.hero-band`. Nothing is offset, nothing
+   is invisible, nothing is left clipped: the reduced-motion reset below
+   sets `transform: none`, which is the static position, and the reset is
+   written WITHOUT `!important` because it is not needed — same specificity
+   as the rule above and later in the file (the §9 reasoning).
+   ------------------------------------------------------------------ */
+
+/* Geometry for the two planes. Outside the `@supports`/`@media` gate on
+   purpose: these are the rules that make the band LOOK right in a browser
+   that will never animate it. */
+.hero-art {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8%;
+  height: 116%;
+}
+
+.hero-haze {
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  top: -8%;
+  height: 116%;
+  pointer-events: none;
+  /* The band's OWN glow token, re-positioned and enlarged — not a new
+     colour. It therefore flips with the theme like every other band
+     surface, and it cannot drift out of the palette. */
+  background: var(--hero-glow);
+  background-size: 150% 150%;
+  background-position: 80% 30%;
+}
+
+@keyframes hero-drift {
+  /* From above the rest position to below it: as the band rises up the
+     screen each plane slides DOWN inside it, so it travels less than the
+     band does. The DIFFERENCE IN TRAVEL between the two planes is the
+     depth cue — see the note above on why the opposite direction is not
+     the principle. */
+  from { transform: translate3d(0, calc(var(--parallax) * -1), 0); }
+  to   { transform: translate3d(0, var(--parallax), 0); }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-layer {
+      animation: hero-drift linear both;
+      /* `auto` is REQUIRED against a scroll timeline, and it must come
+         AFTER the shorthand, which resets it — the same three-declaration
+         ordering §9d records. */
+      animation-duration: auto;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+
+    /* FAR plane: the raster. Travels least. */
+    .hero-art {
+      --parallax: 4%;
+    }
+
+    /* NEAR plane: the atmosphere. Travels most, and the other way. */
+    .hero-haze {
+      --parallax: -11%;
+    }
+  }
+}
+
+/* Reduced motion: REMOVE the planes, do not shorten them. The gate above
+   already excludes this case, so this block is the belt to that braces —
+   it is what makes the intent readable at the rule, and it is the state a
+   browser that ignores `prefers-reduced-motion` inside `@supports` (none
+   today, but the nesting is a real construct) would fall back to. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-layer {
+    animation: none;
+    transform: none;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   9f. CONTINUOUS SCROLL MOTION — every band and card moves for as long
+       as it is on screen, and reverses when you scroll back up
+   ══════════════════════════════════════════════════════════════════
+
+   OWNER'S REQUEST, verbatim, because it is the spec:
+     "animasi css apakah bisa di perlambaaat dan di pakai terus menerus?
+      jadi interactifnya gak sekali pakai tapi selama user masih di
+      scroll atas bawah animasi cssnya jalan terus."
+
+   ── WHAT IS ACTUALLY BEING ASKED FOR, AND WHY §9/§9b DO NOT ANSWER IT ──
+   §9 and §9b are ONE-SHOT: they fire when an element crosses into the
+   viewport and then the observer unobserves it (`BaseLayout.astro`, "these
+   animations run once"). §9d/§9e already answer the "runs continuously"
+   half, but for exactly TWO decorative photographs — they are scoped that
+   narrowly on purpose (see §9d's "TWO PHOTOGRAPHS, NOT TWENTY-FOUR").
+
+   This block extends the CONTINUOUS treatment to the sections and cards.
+   The primitive is the same one §9d uses: `animation-timeline: view()`,
+   which makes the animation's progress a FUNCTION of scroll position. Two
+   properties fall out of that and both are what was asked for:
+
+     1. it never ends while the element is on screen (no observer, no
+        one-shot), and
+     2. it is REVERSIBLE — scroll back up and it runs backwards, because
+        progress is derived from position, not accumulated in time.
+
+   ── THE ONE THING THIS MUST NOT BREAK: THE HOVER RECIPES (§9c) ──────
+   §9d rule 3 records the hard constraint, measured rather than assumed:
+   a CSS *animation* on `transform` OVERRIDES a `transition` on the same
+   property of the SAME element. `.u-lift` and `.u-zoom` are §9c hover
+   recipes, and every service card, tile and banner carries one. So putting
+   a scroll-linked `transform` directly on those elements would silently
+   kill their hover, and nothing in the repo would report it.
+
+   THE FIX IS STRUCTURAL, NOT A FLAG: the scroll LINK is applied to a
+   DIFFERENT ELEMENT than the hover. A card is wrapped by its own <li> or
+   its own section band; the card keeps `.u-lift`/`.u-zoom` and its
+   `:hover`, and the WRAPPER takes the scroll-linked transform. Two
+   elements, two properties, no collision. `[data-scroll]` is therefore
+   opt-in and is placed by the CALL SITE on a container, never on the
+   hoverable surface itself — `e2e/test-scroll-motion.mjs` asserts the two
+   attribute sets never meet on one element, which is the check that keeps
+   this from being re-broken by a future edit.
+
+   ── WHY OPACITY IS ANIMATED BUT NEVER TO 0 ──────────────────────────
+   The drift is a DEPTH cue, not an entrance: the element is already fully
+   present when this starts. So the keyframes move between a small rotation
+   of opacity and never reach 0 — an element that faded to invisible as you
+   scrolled past it would be a content bug wearing an animation costume.
+   The `from`/`to` frames are both readable, which also means a browser that
+   clamps `animation-duration` under reduced motion cannot strand anything
+   invisible: the WORST frame in this block is still legible. That is the
+   opposite of §9's design and it is deliberate — see the reduced-motion
+   note below for why the trap does not apply here.
+
+   ── WHY `animation-range` IS THE WHOLE DURATION AND NOT A SLICE ─────
+   §9d uses `entry 25% cover 50%` because a photograph drifting through a
+   band should NOT move before the band is meaningfully on screen. A section
+   is the opposite: the request is motion "selama user masih di scroll" —
+   for as long as it is visible — so the range is `cover 0% cover 100%`,
+   the full travel of the band from first pixel to last. Each band still
+   gets a different SPEED and DIRECTION (below), so the page reads as a set
+   of surfaces at different distances rather than one field sliding.
+
+   ── PER-SECTION DIFFERENTIATION, AND WHY IT IS DATA NOT SEVEN CLASSES ──
+   §9b already established that "setiap scrollnya bikin transisi beda beda"
+   is a REQUIREMENT, not a nicety. The same rule is honoured here through
+   `data-scroll="<kind>"`, using the SAME `ENTER_KINDS` vocabulary
+   `src/lib/sectionMotion.ts` already owns and `e2e/test-landing.mjs`
+   already cross-checks against the rendered markup. Reusing that table
+   means the scroll kinds cannot drift from the entrance kinds, and a
+   section that enters from the left drifts the same way — the two motions
+   agree instead of fighting.
+
+   ── THE TRAVEL IS SMALL, AND THAT IS THE POINT ──────────────────────
+   A band that translates 60px while scrolling reads as the page coming
+   apart; a card that scales 8% on every scroll tick reads as a bug. The
+   travel here is 10px for a band and 4px for a card — enough to feel the
+   surface respond, far too small to be mistaken for a layout shift, and
+   small enough that it cannot push content under the fixed header or past
+   a section boundary. THE CARDS GET LESS THAN THE BANDS because there are
+   many of them: one band moving 10px is one cue; two hundred cards each
+   moving 10px in the same frame is a shimmer. This is the same restraint
+   §9d argues for, applied to a larger set.
+
+   ── GATING: SUPPORT AND MOTION PREFERENCE, BOTH ─────────────────────
+   Everything that makes anything MOVE lives inside `@supports
+   (animation-timeline: view())` AND `@media (prefers-reduced-motion:
+   no-preference)`. Without support, every element is simply at its natural
+   position — unchanged, because nothing outside the gate touches
+   `transform`. That is a complete degradation with no fallback to write,
+   unlike §9d where the over-size is a looks-right concern that must sit
+   outside.
+
+   THE REDUCED-MOTION TRAP DOES NOT APPLY HERE, and the reason is worth
+   recording so a future reader does not "fix" it: the trap is that §9/§9b
+   use `both` fill from `opacity: 0`, so a clamped duration can strand an
+   element invisible. This block animates between two VISIBLE frames, so a
+   clamped live animation would simply park the element at some small
+   offset — ugly, not broken. That is why this block is gated on
+   `no-preference` rather than reset afterwards: under reduce-motion the
+   animation never applies at all. The belt-and-braces reset at the end is
+   kept anyway, for the same reason §9e keeps its own.
+   ------------------------------------------------------------------ */
+
+:root {
+  /* Band travel. Deliberately the SMALLEST value in this file: §9 moves an
+     item 16px, §9b moves a band 24px, and both of those are ENTRANCES the
+     visitor watches once. This one runs the whole time a band is on
+     screen and repeats on every scroll direction change, so it has a much
+     smaller budget before it stops reading as depth and starts reading as
+     instability. */
+  --scroll-drift: 10px;
+  /* Card travel — smaller still. See "THE CARDS GET LESS THAN THE BANDS". */
+  --scroll-drift-item: 4px;
+  /* Rotation for the "grow" kind. Degrees, and tiny: 0.4deg on a full-width
+     band is a perceptible tilt, while 2deg is a visible mistake. */
+  --scroll-tilt: 0.4deg;
+}
+
+/* ── THE KEYFRAMES ──────────────────────────────────────────────────
+   Two motions only, matching the two things that move. The per-section
+   VARIETY comes from `--scroll-drift` being signed and scaled per kind
+   below, not from more keyframe sets — a keyframed direction cannot be
+   reversed by a data attribute, a variable can. */
+@keyframes scroll-drift-y {
+  from { transform: translate3d(0, calc(var(--scroll-drift) * -1), 0); }
+  to   { transform: translate3d(0, var(--scroll-drift), 0); }
+}
+
+/* The item variant. Same shape, its own travel token, so a section can
+   tune its cards without touching the band's motion. */
+@keyframes scroll-drift-item {
+  from { transform: translate3d(0, calc(var(--scroll-drift-item) * -1), 0); }
+  to   { transform: translate3d(0, var(--scroll-drift-item), 0); }
+}
+
+@keyframes scroll-tilt-y {
+  from { transform: translate3d(0, calc(var(--scroll-drift) * -1), 0) rotate(calc(var(--scroll-tilt) * -1)); }
+  to   { transform: translate3d(0, var(--scroll-drift), 0) rotate(var(--scroll-tilt)); }
+}
+
+/* ── THE MOVE. Everything is inside the gate. ─────────────────────── */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* ── WHY THESE SELECTORS ARE SO LONG, AND WHY IT IS NOT AN ACCIDENT ────
+       MEASURED 2026-09-27: the first version of this block used the plain
+       `[data-scroll]` (0,1,0) and it LOST to §9b for two of the four bands
+       tested. §9b's running-state rule is
+         html.js-reveal [data-enter="grow"].is-entered   → (0,3,1)
+       so on `#galeri` and `#tim` the computed `animation-name` was
+       `enter-grow`, not `scroll-drift-y` — the band animated ONCE and the
+       continuous drift never applied. Both elements carry `data-enter` AND
+       `data-scroll` (they are emitted from the same prop in Section.astro),
+       so both rules match, and the more specific one wins regardless of
+       source order.
+
+       THE FIX IS TO MATCH §9b'S OWN SHAPE rather than to reach for
+       `!important`, for the reason §9 records at length: an `!important`
+       here would reverse the cascade for every later rule touching these
+       elements and would hide the specificity question instead of answering
+       it. So the band selector below repeats the `html.js-reveal
+       [data-enter].is-entered` shape that §9b uses, and adds the scroll
+       attribute as one MORE attribute — (0,4,1) against §9b's (0,3,1), same
+       element, no `!important`, and the two animations are reconciled by
+       SPECIFICITY rather than by force.
+
+       ⚠ `html.js-reveal` IS PART OF THE SELECTOR ON PURPOSE. Without the
+       class the drift would also apply to a visitor with scripting OFF,
+       where §9b is inert and the band should simply sit still. Gating on the
+       same class keeps both behaviours on the same switch.
+
+       The item rule needs no such treatment: no §9b rule targets
+       `[data-scroll-item] > *`, so there is nothing more specific to lose to.
+
+       ── AND WHY `.is-entered` IS *NOT* REQUIRED HERE ──────────────────────
+       The band must drift whether or not its entrance has fired yet — the
+       drift is a function of scroll position, independent of the entrance
+       state machine. Writing `.is-entered` would leave an above-the-fold
+       band (which is marked immediately) and a below-the-fold one on two
+       different code paths for no reason. The selector below therefore does
+       NOT name `.is-entered`, and still outranks §9b because the extra
+       `[data-scroll]` attribute carries more weight than §9b's `.is-entered`
+       class when both are matched against the same element: (0,3,1) + 1
+       attribute = (0,4,1) beats (0,3,1). Verified by measurement, not by
+       reading the spec: `e2e/measure-scroll-motion.mjs` reads
+       `animation-name` on all four bands and requires `scroll-*`. */
+    html.js-reveal [data-scroll][data-enter] {
+      animation: scroll-drift-y linear both;
+      animation-duration: auto;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+
+    /* A band that somehow carries `data-scroll` and no `data-enter` still
+       drifts; it simply cannot borrow §9b's specificity. Kept as its own
+       rule so removing `data-enter` from a call site degrades to "drifts,
+       no entrance" rather than "does nothing". */
+    html.js-reveal [data-scroll]:not([data-enter]) {
+      animation: scroll-drift-y linear both;
+      animation-duration: auto;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+
+    /* Per-kind direction and amount. `slide-left`/`slide-right` reuse the
+       SIGN of the drift to echo the entrance's direction; `grow` takes the
+       tilt variant; `rise`/`drop`/`curtain`/`focus` keep the plain vertical
+       drift, because their entrance already carries the difference and
+       stacking a second idea on the same band reads as noise.
+
+       These are custom-property SETS, so specificity is irrelevant to them
+       winning — a variable is inherited, not cascaded per-rule, and the
+       value resolved at animation time comes from the element itself. */
+    [data-scroll="slide-left"]  { --scroll-drift: -10px; }
+    [data-scroll="slide-right"] { --scroll-drift: 12px; }
+    [data-scroll="drop"]        { --scroll-drift: -8px; }
+    [data-scroll="curtain"]     { --scroll-drift: 6px; }
+    /* `rise` and `focus` take the :root default (10px). */
+
+    /* `grow` needs `animation-name` changed, and that IS a cascaded property,
+       so it has to carry the same specificity as the rule above it — hence
+       the full `html.js-reveal [data-scroll]…` shape rather than the bare
+       attribute. */
+    html.js-reveal [data-scroll="grow"] {
+      --scroll-drift: 8px;
+      animation-name: scroll-tilt-y;
+    }
+    html.js-reveal [data-scroll="grow"][data-enter] {
+      --scroll-drift: 8px;
+      animation-name: scroll-tilt-y;
+    }
+
+    /* A CARD (`[data-scroll-item]`), applied by the container so the
+       hoverable surface underneath keeps its own transform free for §9c.
+       `> *` is what makes the container the only thing a call site has to
+       annotate — the same shape `[data-reveal-stagger]` uses in §9. */
+    [data-scroll-item] > * {
+      animation: scroll-drift-item linear both;
+      animation-duration: auto;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+  }
+}
+
+/* Belt to the `no-preference` braces. See "THE REDUCED-MOTION TRAP DOES NOT
+   APPLY HERE" — under reduce-motion the gate above already excludes the
+   animation, so this block is what a browser that ignores a media query
+   NESTED inside `@supports` would fall back to. `animation: none` plus
+   `transform: none` is the natural position, which is fully correct for
+   every element here (nothing is over-sized, so nothing can expose an
+   edge). */
+@media (prefers-reduced-motion: reduce) {
+  [data-scroll],
+  [data-scroll-item] > * {
+    animation: none;
+    transform: none;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   9g. SURFACE DEPTH — the "kaku" fix
+   ══════════════════════════════════════════════════════════════════
+
+   WHY THIS EXISTS. Owner feedback 2026-09-29: "css mereka bagus bagus
+   keknya punya kita masih kaku bgd" — the MoU partners' sites read as
+   more polished than ours. The measurable cause is NOT a missing
+   animation; it is that every surface here is a FLAT, SINGLE-TONE
+   rectangle with one uniform 1px border. `--color-surface` is one hex
+   for the whole card, so a card at rest has zero internal light and
+   reads as a box drawn on the page rather than a pane sitting above it.
+   That flatness is what "kaku" names.
+
+   WHAT THIS ADDS, AND WHAT IT COSTS. A one-pixel top-lit gradient and a
+   soft hover glow, both from EXISTING tokens (`--color-surface-raised`,
+   `--glow-pink`, `--glow-sky`). No new image, no new library, no new
+   request: `background-image` with a `linear-gradient` is rasterised in
+   one paint, and `box-shadow` at these sizes is a single composite.
+
+   ⚠ WHY A GRADIENT AND NOT A SHADOW, GIVEN Card.astro's OWN RULING.
+   Card.astro moved depth OFF shadows and ONTO borders because on a dark
+   canvas a drop shadow is nearly invisible (DESIGN.md §3.6). That ruling
+   still holds and is NOT contradicted here: the gradient is INTERNAL
+   light (a highlight inside the surface), not an external cast shadow.
+   The two are different devices — a border says where the edge is, an
+   internal highlight says which way is up. Cards keep their border.
+
+   ⚠ THE HOVER GLOW IS A RING, NOT A BLUR. `box-shadow: 0 0 0 1px …` plus
+   a low-alpha spread ring costs one composite and does not promote a
+   layer for the life of the element, which is the same reasoning §9c
+   records for the lift's border transition. A blurred `blur(40px)` glow
+   on every card in a 6-card grid WOULD be the bloat the owner asked to
+   avoid, so the tokens are used at a small spread, not as a bloom.
+
+   TOUCH: the glow is inside the same `@media (hover: hover)` guard the
+   lift uses, because `:hover` sticks after a tap and a card would stay
+   lit. REDUCED MOTION: the glow is a colour/light change, not motion, so
+   it is kept — matching §9c's decision to keep the border brightening. */
+
+@supports (background-image: linear-gradient(180deg, red, blue)) {
+  /*
+     `.u-surface-depth` — opt-in surface light. Applied to cards and panels
+     that want to read as lit panes. Kept as a UTILITY rather than baked into
+     `bg-surface` so a caller can opt out (a full-bleed image card must not
+     have a gradient painted under its picture).
+
+     The gradient is deliberately 0.5%–100% over a TINY alpha range: the top
+     is `--color-surface-raised` at ~35% and the bottom stays the surface. A
+     stronger ramp reads as a two-tone card and draws the eye to the colour
+     instead of the content. */
+  .u-surface-depth {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--color-surface-raised) 35%, transparent) 0%,
+      transparent 55%
+    );
+  }
+
+  @media (hover: hover) {
+    /*
+       The lit edge. `--u-glow` is set per call site (defaults to the neutral
+       accent); a hovered interactive card gets a 1px ring in the accent plus a
+       soft spread, so it reads as "this came forward" without a blur pass. */
+    .u-lift {
+      --u-glow: color-mix(in oklab, var(--color-line-strong) 55%, transparent);
+    }
+    .u-lift:hover {
+      box-shadow:
+        0 0 0 1px var(--u-glow),
+        0 8px 24px -12px color-mix(in oklab, var(--u-glow) 80%, transparent);
+    }
+  }
+}
+
+/* REDUCED MOTION — the glow is light, not movement, so it is KEPT (see §9c
+   for the same call on the border). Nothing to disable here; the block is
+   noted so a future reader does not "fix" the omission by adding a rule that
+   would remove the only remaining hover cue on a static card. */
+
+
+/* ══════════════════════════════════════════════════════════════════
+   8. REDUCED MOTION — final safety net
+   ══════════════════════════════════════════════════════════════════
+
+   global.css carries the broad `*` clamp. This block handles the two
+   things that clamp gets wrong:
+
+   - the boot spinner: `animation-duration: 0.01ms` on an infinite
+     animation still burns a frame every 0.01ms in some engines.
+     Replace it with a static, non-spinning state instead.
+   - the petals: `display: none` WOULD be the cheapest way to "respect"
+     reduced motion, and it is what this block used to do. It was wrong —
+     §2's own reduced-motion rule deliberately keeps the petals falling
+     at a fixed `12s`, matching the legacy intent. Hiding them here
+     contradicted that and removed the layer entirely. The rule is gone;
+     the override in §2 is the single source of truth.
+   ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation: none !important;
+    /* Keep it visible as a static "working" mark rather than a
+       frozen ring at a random angle. */
+    opacity: 0.6 !important;
+  }
+
+  .animate-bounce,
+  .animate-ping,
+  .animate-pulse {
+    animation: none !important;
+  }
+}

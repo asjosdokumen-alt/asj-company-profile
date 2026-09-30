@@ -1,0 +1,2271 @@
+/**
+ * i18n.ts - Language toggle store (123 keys)
+ */
+import { persistentAtom } from '@nanostores/persistent';
+import { atom } from 'nanostores';
+import { useStore } from '@nanostores/preact';
+
+export type Lang = "id" | "jp";
+
+export const langStore = persistentAtom<Lang>("asj_lang", "id", {
+  encode: JSON.stringify,
+  decode: (v: string): Lang => {
+    try {
+      const p = JSON.parse(v);
+      return p === "id" || p === "jp" ? p : "id";
+    } catch {
+      return "id";
+    }
+  },
+});
+
+// P9 fix: jp translations lazy-loaded from separate chunk (~670 lines, ~20KB).
+// Only loaded when user switches to Japanese, cutting initial bundle by ~50%.
+// P9b: dict install is async while renders are sync — without a notify after the
+// chunk arrives, the first JP switch renders Indonesian fallbacks and stays stuck
+// until an unrelated re-render. jpReady bumps subscribers once the dict is in.
+export const jpReady = atom(false);
+let _jpTranslations: Record<string, string> | null = null;
+async function loadJp(): Promise<Record<string, string>> {
+  if (_jpTranslations) return _jpTranslations;
+  const mod = await import('./i18n-jp');
+  _jpTranslations = mod.jpTranslations;
+  translations.jp = _jpTranslations;
+  return _jpTranslations;
+}
+
+/** Ensure the JP dict is loaded AND installed before a JP render reads it. */
+export async function ensureJpLoaded(): Promise<void> {
+  if (Object.keys(translations.jp).length > 0) return;
+  await loadJp();
+}
+
+export const translations: Record<Lang, Record<string, string>> = {
+  id: {
+    "header.login": "Login Pelamar",
+    "header.register": "Daftar Akun",
+    "header.logout": "Keluar",
+    "header.dashboard": "Dashboard",
+    "header.admin": "Panel Admin",
+    "header.admin_login": "Admin Login",
+    "header.public": "Publik",
+    "header.tagline": "Tantangan ke Jepang",
+    "header.company_name": "PT AMANAH SAKURA JAPAN",
+    "header.ai_hr": "AI HR",
+    "header.admin_greeting": "Admin: ",
+    "ui.install_app": "Install App",
+    "ui.menu": "Menu",
+    "ui.close": "Tutup",
+    "ui.select_all": "Pilih semua",
+    "ui.language": "Bahasa",
+    "ui.doc_count_suffix": " dokumen",
+    "ui.ai_cv_assistant": "AI CV Master Assistant",
+    "ui.age_years_suffix": " Tahun",
+    "ui.cand_eval": "Evaluasi Kandidat (Admin)",
+    "ui.cv_alamat": "Alamat Asal",
+    "ui.cv_bio_header": "Biodata",
+    "ui.cv_download_biodata": "Download Full Biodata",
+    "ui.cv_eksternal": "Eksternal",
+    "ui.cv_email": "Email",
+    "ui.cv_fisik": "TB / BB (Fisik)",
+    "ui.cv_gender": "Gender",
+    "ui.cv_jobs_header": "Job / Bidang Yang Dilamar",
+    "ui.cv_no_applications": "Belum ada lamaran.",
+    "ui.cv_note_ext_ph": "Feedback untuk kandidat...",
+    "ui.cv_note_int_ph": "Kelemahan/Catatan khusus admin...",
+    "ui.cv_pendidikan": "Pendidikan",
+    "ui.cv_save_eval": "Simpan Evaluasi Catatan",
+    "ui.cv_save_failed": "Gagal menyimpan catatan.",
+    "ui.cv_siswa_asj": "Siswa ASJ",
+    "ui.cv_status_label": "Status",
+    "ui.cv_ttl": "Tempat, Tgl Lahir",
+    "ui.cv_usia": "Usia",
+    "ui.cv_vip_off": "☐ Tandai VIP",
+    "ui.cv_vip_on": "✅ VIP (Rencana Resmi)",
+    "ui.cv_wa": "WhatsApp",
+    "ui.jft_jlpt": "JFT / JLPT",
+    "ui.loading_candidates": "Memuat data kandidat...",
+    "ui.note_external": "Catatan External (Kandidat)",
+    "ui.note_internal": "Catatan Internal (Private)",
+    "ui.ssw_field": "SSW / Bidang",
+    "ui.dark": "Dark",
+    "ui.light": "Light",
+    "ui.theme": "Tema",
+    "ui.loader_title": "MEMUAT ASJ OS V7...",
+    "ui.loader_msg": "Mempersiapkan UI Modern",
+    "ui.force_close_loading": "Tutup Paksa Loading",
+    "ui.skip_to_content": "Lewati ke konten utama",
+    "public.tab_loker": "Lowongan Loker",
+    "public.tab_layanan": "Program & Layanan ASJ",
+    "public.filter": "Filter",
+    "public.all": "Semua",
+    "public.open": "Buka",
+    "public.urgent": "Urgent",
+    "public.close": "Tutup",
+    "public.no_data": "Tidak ada lowongan ditemukan.",
+    "public.loading": "Memuat data lowongan...",
+    "public.load_error": "Gagal memuat data lowongan. Coba lagi.",
+    "public.empty": "Tidak ada lowongan ditemukan.",
+    "public.lowongan_count": "lowongan",
+    "public.badge_new": "Dibuka Kelas Baru",
+    "public.portal_kandidat": "Portal Kandidat",
+    "public.portal_desc": "CV, Lamaran, Status Tahapan",
+    "public.panel_admin": "Panel Admin",
+    "public.admin_desc": "Kelola Kandidat, Loker, Mail",
+    "public.loker_publik": "Loker Publik",
+    "public.loker_desc": "Lowongan, Pendaftaran Siswa, Visa",
+    "button.lamar": "Lamar",
+    "button.save": "Simpan",
+    "button.submit": "Kirim",
+    "button.cancel": "Batal",
+    "button.back": "Kembali",
+    "button.next": "Selanjutnya",
+    "button.prev": "Sebelumnya",
+    "button.search": "Cari",
+    "button.refresh": "Muat Ulang",
+    "button.close": "Tutup",
+    "button.delete": "Hapus",
+    "button.edit": "Edit",
+    "button.add": "Tambah",
+    "button.confirm": "Konfirmasi",
+    "button.retry": "Coba Lagi",
+    "button.draft": "Simpan Draft",
+    "button.verify": "Verifikasi",
+    "button.enter_portal": "Masuk Portal",
+    "button.portal": "Portal",
+    "form.name": "Nama Lengkap",
+    "form.name_furigana": "Furigana (Kana)",
+    "form.phone": "No WhatsApp",
+    "form.email": "Email",
+    "form.gender": "Jenis Kelamin",
+    "form.gender_m": "Laki-laki",
+    "form.gender_f": "Perempuan",
+    "form.age": "Usia",
+    "form.height": "Tinggi (cm)",
+    "form.weight": "Berat (kg)",
+    "form.address": "Alamat",
+    "form.education": "Pendidikan",
+    "form.search": "Cari...",
+    "form.password": "Password",
+    "form.pin": "PIN",
+    "form.placeholder_name": "Masukkan nama lengkap",
+    "form.placeholder_phone": "628xxxxxxxxxx atau 81xxxxxxxxxx",
+    "form.placeholder_email": "email@contoh.com",
+    "form.placeholder_search": "Cari nama / NIS...",
+    "siswa.title": "Pendaftaran Siswa Baru",
+    "siswa.tab_chat": "Chat Jeklin",
+    "siswa.tab_form": "Form Siswa",
+    "siswa.greeting": "Yatta! Halo kak! Kenalin aku Qween Jeklin \uD83D\uDC51. Mau daftar jadi siswa ASJ ya? Biar gampang, kita ngobrol aja yuk! Boleh sebutin **Nama Lengkap** kakak dulu?",
+    "siswa.assistant": "Asisten Pendaftaran ASJ",
+    "siswa.field_nama": "Nama Lengkap",
+    "siswa.field_ttl": "Tempat & Tgl Lahir",
+    "siswa.field_gender": "Gender (Laki-laki/Perempuan)",
+    "siswa.field_agama": "Agama",
+    "siswa.field_email": "Email Aktif",
+    "siswa.field_alamat": "Alamat Lengkap",
+    "siswa.field_pendidikan": "Pendidikan Terakhir",
+    "siswa.field_wa_siswa": "Nomor WA Siswa",
+    "siswa.field_wa_ortu": "Nomor WA Ortu/Wali",
+    "siswa.field_ktp": "Upload Scan KTP",
+    "siswa.field_kk": "Upload Scan KK",
+    "siswa.field_ijazah": "Upload Scan Ijazah",
+    "siswa.missing_header": "\u26A0\uFE0F Dede Jeklin lihat ada data yang belum lengkap nih kak:",
+    "siswa.missing_footer": "Yuk dilengkapi dulu! Boleh diisi manual di kotak kanan, atau ngobrol lagi sama Jeklin.",
+    "siswa.submit_btn": "SUBMIT DATA",
+    "siswa.success": "\u2705 Pendaftaran berhasil masuk ke sistem ASJ! Harap tunggu info selanjutnya ya.",
+    "siswa.failed": "Gagal:",
+    "siswa.network_error": "Sinyal error nih kak. Pastikan internet lancar dan coba lagi!",
+    "siswa.analyzing": "Qween Jeklin sedang memikirkan balasan\u2026",
+    "siswa.data_pribadi": "Data Pribadi",
+    "siswa.doc_scan": "Dokumen",
+    "siswa.upload_failed": "Gagal mengunggah dokumen:",
+    "siswa.chat_error": "Sinyal muter-muter kak. Coba kirim ulang ya!",
+    "siswa.success_btn": "BERHASIL!",
+    "siswa.upload_doc": "Mengunggah dokumen...",
+    "siswa.saving": "Menyimpan data...",
+    "siswa.form_title": "FORM SISWA BARU ASJ",
+    "siswa.form_hint": "Jawab pertanyaan Jeklin untuk mengisi form otomatis.",
+    "siswa.draft_stale": "Draf lebih dari 24 jam. Data mungkin sudah tidak relevan.",
+    "siswa.send": "Kirim",
+    "apply.title": "Form Lamaran",
+    "apply.step_data": "Data Diri",
+    "apply.step_education": "Pendidikan",
+    "apply.step_upload": "Dokumen",
+    "apply.step_docs": "Dokumen",
+    "apply.step_kirim": "Kirim",
+    "apply.job_label": "Lowongan",
+    "apply.bidang_label": "Bidang",
+    "apply.job_ph": "Pilih lowongan",
+    "apply.bidang_ph": "Pilih bidang",
+    "apply.agree_text": "Saya setuju data ini digunakan untuk proses rekrutmen",
+    "apply.fast": "Cepat",
+    "apply.safe": "Aman",
+    "apply.asj": "ASJ Portal",
+    "apply.loading": "Mengirim lamaran...",
+    "apply.success_title": "Lamaran Terkirim!",
+    "apply.success_desc": "Lamaran Anda berhasil dikirim.",
+    "apply.btn_portal": "Kembali ke Portal",
+    // Tombol di toolbar bawah. Sebelum ini keduanya hardcoded ("Draft" / "Lanjut")
+    // sehingga tetap Indonesia di halaman JP — e2e/probe-untranslated.mjs menangkapnya.
+    // "Draft" diterjemahkan sebagai kata biasa, bukan dibiarkan sebagai istilah
+    // Inggris, karena halaman ini tidak pernah memakai istilah Inggris lain.
+    "apply.btn_draft": "Draf",
+    "apply.btn_next": "Lanjut",
+    "apply.btn_pilih": "Pilih",
+    "apply.wa_ph": "Contoh: 08123456789",
+    "apply.wa_found": "Data Anda ditemukan di sistem ASJ. Nama & email terisi otomatis.",
+    "apply.wa_not_found": "Nomor ini belum terdaftar di sistem ASJ.",
+    "apply.wa_error": "Gagal memeriksa riwayat lamaran.",
+    "apply.nama_label": "Nama Lengkap",
+    "apply.nama_ph": "Sesuai KTP / Paspor",
+    "apply.nama_tip": "Otomatis diubah ke huruf kapital",
+    "apply.email_label": "Email Aktif",
+    "apply.email_ph": "Contoh: nama@gmail.com",
+    "apply.gender_label": "Jenis Kelamin",
+    "apply.gender_pilih": "Pilih",
+    "apply.usia_label": "Usia",
+    "apply.usia_ph": "Contoh: 22",
+    "apply.tb_label": "Tinggi Badan",
+    "apply.bb_label": "Berat Badan",
+    "apply.photo_label": "Pas Foto",
+    "apply.photo_sub": "JPG / PNG",
+    "apply.cv_label": "CV / Resume",
+    "apply.cv_sub": "PDF / Excel / Word",
+    "apply.jft_label": "Sertifikat JFT",
+    "apply.jft_sub": "PDF (1 file)",
+    "apply.ssw_label": "Sertifikat SSW / Senmonkyu",
+    "apply.ssw_sub": "PDF (1 file)",
+    "apply.error_agree": "Anda harus menyetujui pernyataan terlebih dahulu.",
+    "apply.error_submit": "Gagal mengirim lamaran.",
+    "apply.error_magang_vip": "Lowongan Magang hanya untuk siswa resmi ASJ (VIP). Hubungi admin untuk pendaftaran kelas.",
+    "apply.file_none": "Belum ada file",
+    "apply.loading_hint": "Mohon tunggu, jangan tutup halaman ini.",
+    "master.title": "Form CV Master",
+    "master.step_identitas": "Identitas",
+    "master.step_medis": "Medis & Wawancara",
+    "master.step_riwayat": "Riwayat",
+    "master.step_keluarga": "Keluarga",
+    "master.step_dokumen": "Dokumen",
+    "master.login_gate": "Verifikasi Password",
+    "master.login_wa": "No WhatsApp",
+    "master.login_pass": "Password",
+    "form.mf_agama": "Agama",
+    "form.mf_agama_jp": "Agama (JP)",
+    "form.mf_alamat": "Alamat Lengkap",
+    "form.mf_alasan_bidang": "Alasan Memilih Bidang Kerja Ini",
+    "form.mf_alergi": "Riwayat Alergi",
+    "form.mf_alert_besar": "File terlalu besar!",
+    "form.mf_alert_draft": "Draft Anda berhasil tersimpan!",
+    "form.mf_alert_final": "Berhasil! Profil Master Anda telah tersimpan.",
+    "form.mf_alert_gagal": "Gagal: ",
+    "form.mf_alert_koneksi": "Koneksi Error. Pastikan internet stabil. Pesan: ",
+    "form.mf_alert_login_dulu": "Silakan masuk dengan akun kandidat Anda sebelum menyimpan.",
+    "form.mf_alert_nama_wajib": "Nama lengkap wajib diisi!",
+    "form.mf_alert_sistem": "Terjadi kesalahan sistem: ",
+    "form.mf_alert_translate": "Peringatan: Terjemahan otomatis ke bahasa Jepang gagal. Versi Jepang akan tampil kosong di CV.",
+    "form.mf_baju": "Ukuran Baju",
+    "form.mf_bb": "Berat (KG)",
+    "form.mf_belum_file": "Belum ada file",
+    "form.mf_bhs_jepang": "Sertifikat Bahasa Jepang (\u65E5\u672C\u8A9E\u80FD\u529B)",
+    "form.mf_bulan_masuk": "Cth: IPA / Teknik Mesin",
+    "form.mf_buta_warna": "Buta Warna?",
+    "form.mf_darurat": "Kontak Darurat (Wajib)",
+    "form.mf_darurat_nama": "Nama Kontak Darurat",
+    "form.mf_darurat_wa": "No. WA Darurat",
+    "form.mf_draft": "Draft",
+    "form.mf_eks_jepang": "Status Eks Jepang",
+    "form.mf_email": "Email Aktif",
+    "form.mf_exp": "Tgl Expired",
+    "form.mf_file_saved": "File Tersimpan. Abaikan jika tak diganti.",
+    "form.mf_file_tersimpan": "File Tersimpan. Abaikan jika tak diganti.",
+    "form.mf_furigana": "Furigana (Katakana)",
+    "form.mf_gagal_masuk": "Gagal masuk.",
+    "form.mf_gaji": "Gaji (Yen/Rp)",
+    "form.mf_gaji_terakhir": "Gaji Terakhir (Rp/Yen)",
+    "form.mf_gaji_yen": "Harapan Gaji (Yen)",
+    "form.mf_gate_desc": "Masukkan password akun kandidat Anda untuk mengisi / memperbarui data.",
+    "form.mf_gate_pw_wajib": "Password wajib diisi.",
+    "form.mf_gate_title": "Verifikasi Akun Kandidat",
+    "form.mf_gender": "Gender",
+    "form.mf_gender_jp": "Gender (JP)",
+    "form.mf_goldar": "Gol. Darah",
+    "form.mf_hobi": "Hobi & Minat",
+    "form.mf_hubungan": "Hubungan",
+    "form.mf_identitas": "Identitas Dasar",
+    "form.mf_ijazah_sd_file": "IJAZAH SD (PDF)",
+    "form.mf_ijazah_sma_file": "IJAZAH SMA (PDF)",
+    "form.mf_ijazah_smp_file": "IJAZAH SMP (PDF)",
+    "form.mf_ima_made": "Ima Made (Sekarang)",
+    "form.mf_jabatan": "Jabatan / Posisi (\u8077\u7A2E)",
+    "form.mf_jft_file": "SERTIFIKAT JFT (PDF)",
+    "form.mf_jurusan": "Jurusan (\u5C02\u653B)",
+    "form.mf_kacamata": "Berkacamata?",
+    "form.mf_keahlian": "Keahlian Khusus / Lisensi",
+    "form.mf_keinginan": "Keinginan Pribadi (Target)",
+    "form.mf_kekurangan": "Kekurangan Sifat (Beserta Solusi)",
+    "form.mf_kelebihan": "Kelebihan Sifat",
+    "form.mf_keluar": "Bulan/Thn Keluar",
+    "form.mf_keluarga_maks": "Anggota Keluarga (Maks 5)",
+    "form.mf_keluarga_n": "Keluarga",
+    "form.mf_kembali": "Kembali",
+    "form.mf_kenalan": "Kenalan di Jepang",
+    "form.mf_kenalan_alamat": "Alamat di Jepang",
+    "form.mf_kenalan_hubungan": "Hubungan",
+    "form.mf_kenalan_nama": "Nama Kenalan",
+    "form.mf_kenalan_pekerjaan": "Pekerjaan",
+    "form.mf_kenalan_usia": "Usia",
+    "form.mf_kk_file": "KK (PDF)",
+    "form.mf_kontak": "Kontak & Fisik",
+    "form.mf_kota_paspor": "Kota Penerbitan",
+    "form.mf_ktp": "KTP (NIK)",
+    "form.mf_ktp_file": "KTP (PDF)",
+    "form.mf_laka": "Riwayat Kecelakaan / Operasi",
+    "form.mf_lama_jepang": "Rencana Lama di Jepang (Thn)",
+    "form.mf_lanjut": "Lanjut",
+    "form.mf_lisensi": "Sertifikat Lisensi / SSW 1 (\u7279\u5B9A\u6280\u80FD)",
+    "form.mf_lulus": "Bulan/Thn Lulus (\u5352\u696D)",
+    "form.mf_masuk": "Masuk",
+    "form.mf_masuk_bulan": "Bulan/Thn Masuk (\u5165\u5B66)",
+    "form.mf_mata_kanan": "Mata Kanan (Visus)",
+    "form.mf_mata_kiri": "Mata Kiri (Visus)",
+    "form.mf_medis_title": "Catatan Medis",
+    "form.mf_memeriksa": "Memeriksa\u2026",
+    "form.mf_merokok": "Merokok?",
+    "form.mf_mode_preview": "Mode Preview: Nomor WA tidak ditemukan di URL, auto-fill dilewati.",
+    "form.mf_motivasi": "Motivasi Ke Jepang",
+    "form.mf_nama": "Nama Lengkap (KTP)",
+    "form.mf_nama_keluarga": "Nama",
+    "form.mf_nama_sekolah": "Nama Sekolah (\u5B66\u6821\u540D)",
+    "form.mf_nilai": "Nilai / Skor Ujian (\u70B9\u6570)",
+    "form.mf_no_coe": "No. COE (Bagi Eks Jepang)",
+    "form.mf_no_paspor": "No. Paspor",
+    "form.mf_panggilan": "Nama Panggilan",
+    "form.mf_panggilan_ktk": "Panggilan (Katakana)",
+    "form.mf_paspor_status": "Status Paspor",
+    "form.mf_password": "Password kandidat",
+    "form.mf_pekerjaan": "Pekerjaan (\u8077\u696D)",
+    "form.mf_pekerjaan_n": "Pekerjaan",
+    "form.mf_pendidikan_n": "Pendidikan",
+    "form.mf_penyakit": "Riwayat Penyakit Berat (Jujur)",
+    "form.mf_perusahaan": "Perusahaan",
+    "form.mf_ph_alergi": "Deskripsikan alergi obat/makanan jika ada\u2026",
+    "form.mf_ph_auto_jp": "Otomatis diterjemahkan ke Jepang saat disimpan",
+    "form.mf_ph_baju": "S/M/L/XL",
+    "form.mf_ph_belum_punya": "Kosongkan jika belum punya",
+    "form.mf_ph_deskripsi": "Deskripsikan jika ada\u2026",
+    "form.mf_ph_gate": "Password kandidat",
+    "form.mf_ph_hobi": "Memancing, Olahraga, dll (Otomatis diterjemahkan ke Jepang)",
+    "form.mf_ph_istri_ortu": "Istri / Orang Tua",
+    "form.mf_ph_jabatan_lain": "Ketik jabatan lain / \u305D\u306E\u4ED6\u306E\u8077\u7A2E\u3092\u5165\u529B",
+    "form.mf_ph_jurusan": "Cth: IPA / Teknik Mesin",
+    "form.mf_ph_karyawan": "Karyawan / Mahasiswa",
+    "form.mf_ph_keahlian": "Mengelas, Alat Berat, dll (Kosongkan jika tidak ada)",
+    "form.mf_ph_kekurangan": "Pelupa (Tapi saya selalu mencatat), dll",
+    "form.mf_ph_kelebihan": "Disiplin, Pekerja Keras, dll",
+    "form.mf_ph_kenalan": "Kosongkan jika tidak ada (Otomatis ke katakana)",
+    "form.mf_ph_kosongkan": "Kosongkan jika tidak ada",
+    "form.mf_ph_kota": "Kota / Prefektur (Otomatis diterjemahkan)",
+    "form.mf_ph_misal_gaji": "Misal: 200000",
+    "form.mf_ph_misal_tabungan": "Misal: 300 Juta",
+    "form.mf_ph_nilai": "Misal: 120/180",
+    "form.mf_ph_no_paspor": "Nomor paspor\u2026",
+    "form.mf_ph_no_sim": "Nomor SIM\u2026",
+    "form.mf_ph_pekerjaan_lain": "Ketik pekerjaan lain / \u305D\u306E\u4ED6\u306E\u8077\u696D\u3092\u5165\u529B",
+    "form.mf_ph_promosi": "Tuliskan kelebihan dan dedikasi Anda agar perusahaan Jepang tertarik.",
+    "form.mf_ph_sal": "Cth: 5000000",
+    "form.mf_ph_sim": "A / C / A & C (Kosongkan jika tidak ada)",
+    "form.mf_ph_surabaya": "Misal: SURABAYA",
+    "form.mf_ph_teks_jepang": "Teks Jepang",
+    "form.mf_ph_teman": "Teman / Saudara",
+    "form.mf_ph_visus": "Normal / Minus 1",
+    "form.mf_photo": "PAS PHOTO (JPG/PNG)",
+    "form.mf_pilih": "PILIH",
+    "form.mf_pilih_tempat": "Pilih",
+    "form.mf_ketik_manual": "Ketik di sini bila tidak ada di daftar",
+    "form.mf_promosi": "Jiko PR (Promosi Diri)",
+    "form.mf_rencana_pulang": "Rencana Setelah Pulang",
+    "form.mf_riwayat_pekerjaan": "Riwayat Pekerjaan (Maks 3)",
+    "form.mf_riwayat_pendidikan": "Riwayat Pendidikan (Maks 5)",
+    "form.mf_save_draft": "Menyimpan Draft\u2026",
+    "form.mf_save_final": "Menyimpan Final\u2026",
+    "form.mf_selesai": "Selesai!",
+    // Badge perubahan belum disimpan (legacy master-full.html:336
+    // `#unsaved-badge`, teks hardcode Indonesia di sana). Diterjemahkan ke JP
+    // karena di sini badge-nya ikut mode bahasa.
+    "form.mf_unsaved": "Belum tersimpan",
+    "form.mf_sepatu": "Ukuran Sepatu (CM)",
+    "form.mf_sertifikasi": "Sertifikasi & Bahasa (\u8CC7\u683C\u30FB\u8A00\u8A9E)",
+    "form.mf_sesi_berakhir": "Sesi berakhir atau tidak cocok dengan nomor WA ini. Silakan masuk ulang.",
+    "form.mf_sesi_simpan": "Sesi berakhir atau tidak cocok. Silakan masuk ulang.",
+    "form.mf_sim": "SIM",
+    "form.mf_sim_status": "Status SIM",
+    "form.mf_simpan_final": "Simpan Final",
+    "form.mf_ssw_file": "SERTIFIKAT SSW (PDF)",
+    "form.mf_status_ada": "ADA (\u6709)",
+    "form.mf_status_nikah": "Status Nikah",
+    "form.mf_status_paspor": "Status & Paspor",
+    "form.mf_status_tidak_ada": "TIDAK ADA (\u7121)",
+    "form.mf_sync": "Menyinkronkan Data\u2026",
+    "form.mf_tabungan": "Target Tabungan (Rp/Yen)",
+    "form.mf_tahan_ac": "Tahan Kerja Tanpa AC?",
+    "form.mf_tangan": "Tangan Dominan",
+    "form.mf_tato": "Bertato?",
+    "form.mf_tb": "Tinggi (CM)",
+    "form.mf_tempat_lahir": "Tempat Lahir",
+    "form.mf_tgl_lahir": "Tgl Lahir",
+    "form.mf_tgl_terbit": "Tgl Terbit",
+    "form.mf_tindik": "Bertindik?",
+    "form.mf_tingkat": "Tingkat (\u30EC\u30D9\u30EB)",
+    "form.mf_topi": "Ukuran Topi (S/M/L)",
+    "form.mf_tujuan_jepang": "Tujuan Kerja di Jepang",
+    "form.mf_univ_file": "IJAZAH UNIVERSITAS (PDF)",
+    "form.mf_upload": "Upload Dokumen (MAX 2MB)",
+    "form.mf_usia": "Usia",
+    "form.mf_wa": "Form terhubung ke WA:",
+    "form.mf_wawancara": "Wawancara & Jiko PR (CV)",
+    "ai_cv.title": "AI CV Form",
+    "ai_cv.chat_placeholder": "Ketik pesan ke AI...",
+    "ai_cv.translate_all": "Terjemahkan semua kolom ID ke JP",
+    "share.title": "Share View",
+    "share.no_data": "Tidak ada data kandidat",
+    "admin.tab_pelamar": "Pelamar",
+    "admin.tab_mail": "Mail",
+    "admin.tab_db_job": "DB Job",
+    "admin.tab_kelola": "Kelola",
+    "admin.tab_tambah": "Tambah",
+    "admin.tab_config": "Pengaturan",
+    "admin.tab_jadwal": "Jadwal",
+    "admin.tab_wa": "Template WA",
+    "dash.title": "Dashboard Kandidat",
+    "dash.welcome": "Selamat datang,",
+    "admin.tab_public_job": "Lowongan Publik",
+    "admin.search_placeholder": "Cari...",
+    "admin.form_job_name": "Nama Pekerjaan",
+    "admin.form_location_short": "Lokasi",
+    "admin.form_note_short": "Catatan",
+    "admin.form_quota_short": "Kuota",
+    "admin.form_req_short": "Persyaratan",
+    "admin.tab_internal_db": "DB Job Internal",
+    "admin.tab_add_job": "Tambah Job",
+    "admin.tab_schedule": "Jadwal Agenda",
+    /* Sidebar labels for the two tabs that replaced the dashboard header tiles
+       (2026-09-26). Short on purpose: the sidebar is w-64 and the longer
+       existing strings ("Agenda & Jadwal Terdekat", "Papan Tugas Tim") wrap. */
+    "admin.tab_agenda": "Agenda",
+    "admin.tab_tugas": "Papan Tugas",
+    "admin.new_schedule": "Buat Jadwal",
+    "admin.save_schedule": "Simpan Jadwal",
+    "admin.schedule_waktu": "WAKTU (TGL & JAM)",
+    "admin.aksi": "Aksi",
+    "admin.saving": "Menyimpan...",
+    "admin.input_manual_title": "Input Kandidat Manual",
+    "admin.list_kandidat": "List Kandidat",
+    "admin.keep_existing_docs": "Jika dipilih, dokumen lama kandidat akan dipertahankan.",
+    "admin.save_upload": "Simpan & Upload",
+    "admin.privilege_tag": "Privilege Tag:",
+    "admin.save_pdf": "Simpan PDF",
+    "admin.print_rirekisho": "Cetak Rirekisho",
+    "admin.foto": "FOTO",
+    "admin.preview_mode_admin_only": "MODE PREVIEW — Hanya bisa dicetak oleh Admin",
+    "admin.db_migrate_cli_only": "Pembaruan struktur database dijalankan dari CLI, bukan dari UI. Endpoint migrasi lewat HTTP sudah dihapus permanen: perubahan skema tidak boleh dapat dipicu dari body POST.",
+    "admin.run_from_terminal": "Jalankan dari terminal:",
+    "admin.marquee_hint": "Teks ini akan muncul berjalan (Marquee) di semua halaman.",
+    "admin.tab_candidate": "Data Pelamar",
+    "admin.task_board": "Papan Tugas Tim",
+    "admin.task_placeholder": "Ketik tugas baru lalu tekan Tambah...",
+    "admin.task_empty": "Belum ada tugas.",
+    "admin.task_done": "Tandai selesai",
+    "ui.agenda_recent": "Agenda & Jadwal Terdekat",
+    "ui.schedule_empty": "Jadwal akan dimuat dari backend.",
+    "ui.open_schedule": "Buka Kelola Jadwal ",
+    "ui.wa_pintar": "WA Pintar",
+    "ui.settings": "Pengaturan",
+    "ui.marquee_default": "Selamat Datang di ASJ Portal — PT Amanah Sakura Japan",
+
+    "form.ai_cv_chat": "Chat Jeklin",
+    "form.preview_cv": "Preview CV",
+    "form.ai_analyzing": "Jeklin sedang menganalisis...",
+    "form.cv_edit_hint": "Edit manual aktif. Data tersimpan otomatis.",
+    "form.placeholder_chat": "Ketik balasanmu di sini...",
+    // Petunjuk di bawah label field Jiko-PR (legacy i18n id/form.js:242-260).
+    // Disalin apa adanya: teks inilah yang benar-benar tampil di legacy
+    // (atribut data-lang menimpa teks inline di HTML-nya).
+    "form.ai_promosi_helper": "Tuliskan kepribadian, kebiasaan, dan hal yang ingin Anda tonjolkan ke perusahaan Jepang secara singkat.",
+    "form.ai_kelebihan_helper": "Tuliskan kelebihan Anda beserta contoh nyatanya.",
+    "form.ai_kekurangan_helper": "Tuliskan kekurangan Anda beserta cara memperbaikinya.",
+    "form.ai_keahlian_helper": "Contoh: mengelas, mengoperasikan mesin, SIM (kosongkan jika tidak ada).",
+    "form.ai_hobi_helper": "Tuliskan hobi aktivitas maupun non-aktivitas beserta manfaatnya untuk Anda. Contoh: Memancing \u2014 melatih kesabaran & fokus.",
+    "form.ai_alasan_helper": "Tuliskan alasan memilih bidang kerja ini dan apa yang membuat Anda tertarik.",
+    "form.ai_motivasi_helper": "Alasan utama Anda ingin bekerja atau belajar di Jepang.",
+    "form.ai_keinginan_helper": "Target atau impian pribadi selama di Jepang dan setelah pulang.",
+    "form.ai_rencana_helper": "Apa yang ingin Anda lakukan setelah pulang dari Jepang? Contoh: buka usaha, bangun rumah.",
+    "form.ai_tujuan_helper": "Apa tujuan utama Anda bekerja di Jepang? Contoh: menambah pengalaman yang lebih luas.",
+    "form.txt_diproses": "Diproses",
+    "form.txt_lamaran_gagal": "Lamaran Gagal",
+    "form.txt_lamaran_lulus": "Lamaran Lulus",
+    "form.txt_menunggu_review": "Menunggu Review",
+    "form.txt_review_admin": "Review Admin",
+    "form.txt_tahapan_saat_ini": "Tahapan Saat Ini:",
+    "candidate.welcome": "Selamat Datang",
+    "candidate.job_applied": "Job Dilamar:",
+    "candidate.stage": "Tahapan:",
+    "candidate.gender_l": "Laki-laki",
+    "candidate.gender_p": "Perempuan",
+    "candidate.doc_revise_title": "Dokumen Perlu Revisi",
+    "candidate.doc_revise_desc": "Silakan perbaiki dan upload ulang.",
+    "button.apply_now": "Lamar Sekarang",
+    "button.chat_wa": "Chat WA",
+    "button.closed": "Tutup",
+    "button.format": "Format",
+    "button.save_db": "SIMPAN DB",
+    "button.upload_revise": "Upload Revisi",
+    "button.view_cv": "Lihat CV",
+    "button.view_public_jobs": "Lihat Loker",
+    "option.LAKI-LAKI": "Laki-laki",
+    "option.PEREMPUAN": "Perempuan",
+    "option.PRIA": "Pria",
+    "option.WANITA": "Wanita",
+    "option.LAKI": "Laki-laki",
+    "option.PEREM": "Perempuan",
+    "status.open": "OPEN",
+    "status.urgent": "URGENT",
+    "status.close": "CLOSE",
+    "jobcat.PERTANIAN": "Pertanian",
+    "jobcat.PETERNAKAN": "Peternakan",
+    "jobcat.PERIKANAN": "Perikanan",
+    "jobcat.KONSTRUKSI": "Konstruksi",
+    "jobcat.MANUFAKTUR": "Manufaktur",
+    "jobcat.MAKANAN": "Makanan",
+    "jobcat.PENGOLAHAN": "Pengolahan",
+    "jobcat.PERAWATAN": "Perawatan",
+    "jobcat.PERTAMBANGAN": "Pertambangan",
+    "jobcat.TEKNIK": "Teknik",
+    "job.loc_pfx": "Prefektur",
+    "login.pass_label": "Password",
+    "login.wa_ph": "0812xxxx",
+    "login.pass_ph": "Masukkan password",
+    "login.btn_masuk": "Masuk",
+    "login.btn_masuk_loading": "Memeriksa...",
+    "login.btn_daftar": "Daftar Sekarang",
+    "login.btn_daftar_loading": "Mendaftar...",
+    "admin.auth_title": "Otorisasi Sistem",
+    "admin.select_account": "Pilih Akun Admin",
+    "admin.enter_pin": "Masukkan PIN",
+    "admin.pin_master": "PIN Master",
+    "admin.pin_personal": "PIN Pribadi",
+    "login.pin_salah": "PIN salah",
+    "login.selamat_datang": "Selamat datang, ",
+    "login.nama_label": "Nama Lengkap",
+    "login.pass_hint_reg": "Password = 4 digit terakhir WA",
+    "login.have_account": "Sudah punya akun?",
+    "login.no_account": "Belum punya akun?",
+    "login.back": "Kembali",
+    "login.reg_ok": "Registrasi berhasil! Silakan login.",
+    "login.reg_failed": "Registrasi gagal",
+    "login.failed": "Login gagal",
+    "login.api_error": "Kesalahan server (HTTP {s})",
+    "login.wa_invalid": "Nomor WA tidak valid. Gunakan format 08xx/628xx (Indonesia) atau 090/070/080/81xx (Jepang).",
+    "login.pass_min": "Password minimal 4 karakter",
+    "login.pass_max": "Password maksimal 20 karakter",
+    "login.pass_nospace": "Password tidak boleh mengandung spasi",
+    "login.nama_min": "Nama minimal 2 karakter",
+    "login.pin_required": "PIN harus diisi",
+    "login.admin_name_required": "Nama admin harus diisi",
+    "login.wa_label": "No WhatsApp",
+    "ui.badge_bronze": "Terdaftar (Bronze)",
+    "ui.badge_silver": "CV Mini Selesai (Silver)",
+    "ui.badge_gold": "Master Profile Selesai (Gold Crown)",
+    "ui.badge_official": "Siswa Resmi ASJ",
+    "ui.perfect_student": "PERFECT ASJ STUDENT",
+    "ui.profile_100": "Profil 100% Selesai!",
+    "ui.profile_incomplete": "Selesaikan CV Mini & Master Profile",
+    "ui.change_password": "Ganti Password",
+    "ui.student_id": "ID Siswa ASJ",
+    "ui.student_name": "Nama Siswa",
+    "ui.loading": "Memuat...",
+    "ui.note": "Catatan",
+    "ui.benefit": "Benefit",
+    "ui.include": "Termasuk",
+    "ui.exclude": "Tidak Termasuk",
+    "ui.requirements": "Persyaratan",
+    "ui.quota": "Kuota",
+    "ui.reg_id": "ID Registrasi",
+    "ui.share_modal_title": "Share Loker",
+    "ui.share_link_view": "LINK SHARE VIEW (UNTUK TSK)",
+    "ui.share_template_label": "PESAN COPAS KE WA (TEMPLATE)",
+    "ui.share_copas_wa": "Copas ke WA",
+    "ui.share_open_view": "Buka Share View",
+    "ui.master_full_form": "Form Master Lengkap",
+    "ui.edit_quick_cv": "Edit Cepat CV",
+    "ui.update_cv_mini": "Update Profil",
+    "ui.cv_mini_basic": "Profil (Data Dasar)",
+    "ui.cv_master_detail": "Profil (Data Lengkap)",
+    "ui.cv_type_hint": "Pilih data dasar untuk profil singkat, data lengkap untuk rincian menyeluruh.",
+    "ui.detail_total_title": "Total Biaya Ke Jepang",
+    "ui.detail_total_sub": "Bisa dicicil sesuai tahapan",
+    "ui.detail_syarat": "Persyaratan",
+    "ui.detail_keterangan": "Keterangan",
+    "ui.berkas_stage_hint": "Tahap Submit Berkas",
+    "ui.complete_berkas_biodata": "Lengkapi Pemberkasan & Biodata",
+    "ui.app_status_latest": "Status Lamaran Terkini",
+    "ui.app_list_title": "Daftar Lamaran",
+    "ui.status_approved_by_admin": "Telah disetujui admin",
+    "ui.biodata_approved_by_admin": "Berkas telah disetujui admin",
+    "ui.biodata_revisi": "Berkas perlu revisi",
+    "ui.biodata_menunggu": "Berkas menunggu review admin",
+    "ui.biodata_belum": "Berkas belum dikirim",
+    "ui.biodata_label": "Berkas",
+    "ui.no_app_yet_general": "Anda belum pernah melamar lowongan. Lamaran muncul di sini setelah Anda mengirim form.",
+    "ui.no_app_for_loker": "Tidak ada lamaran untuk loker ini.",
+    "ui.asj_dossier": "Dokumen ASJ",
+    "ui.vip_member": "VIP MEMBER",
+    "ui.toast_ai_cv_locked": "Fitur AI CV Master eksklusif untuk Siswa ASJ (VIP / Kelas LPK). Hubungi Admin untuk akses.",
+    "admin.ai_btn_model": "Model Doc",
+    "admin.ai_btn_parse": "Parse & Update",
+    "admin.ai_btn_update_bio": "Update Biodata",
+    "admin.ai_candidate_label": "Kandidat: ",
+    "admin.ai_field_biodata": "field biodata",
+    "admin.ai_results_title": "Hasil Wawancara",
+    "admin.ai_tab_chat": "Chat",
+    "admin.ai_tab_parse": "Parse",
+    "admin.ai_tab_results": "Hasil",
+    "admin.ai_updated_label": "Diperbarui: ",
+    "admin.ai_upload_label": "Upload CV/Excel/PDF — auto parse & update biodata",
+    "admin.btn_ai_hr": "AI HR",
+    "admin.btn_cv_ai": "CV AI",
+    "admin.btn_match": "Match",
+    "admin.sort": "Urutkan:",
+    "admin.sort_newest": "Terbaru",
+    "admin.sort_oldest": "Terlama",
+    "admin.sort_most": "Terbanyak",
+    "admin.history_internal": "Histori Job Internal",
+    "admin.doc_ijazah_sd": "Ijazah SD",
+    "admin.doc_ijazah_sma": "Ijazah SMA",
+    "admin.doc_ijazah_smp": "Ijazah SMP",
+    "admin.doc_univ": "Ijazah Universitas",
+    "admin.form_category": "KATEGORI BIDANG",
+    "admin.form_gender": "GENDER",
+    "admin.form_job_code_ro": "KODE JOB (READONLY)",
+    "admin.form_tsk": "TSK PENGURUS",
+    "admin.interview_ph": "Ketik jawabanmu dalam bahasa Jepang (Romaji/Kana)…",
+    "admin.modal_edit_job_title": "Edit Loker Full",
+    "admin.monthly_report": "Laporan Bulanan",
+    "admin.report_by_stage": "Per Tahapan",
+    "admin.report_by_status": "Per Status",
+    "admin.report_empty": "Tidak ada data kandidat.",
+    "admin.report_title": "Laporan Kandidat per Loker",
+    "admin.report_total": "Total",
+    "ai.bidang_label": "Bidang SSW: ",
+    "ai.parse_ok_title": "Parse berhasil",
+    "ai.status_fetching": "Mengambil hasil wawancara…",
+    "ai.status_generating": "Membuat model wawancara…",
+    "ai.status_parsing": "{name} sedang diparse — AI membaca biodata…",
+    "ai.status_updating": "Memperbarui biodata…",
+    "alert.failed": "Gagal!",
+    "alert.network": "Koneksi error: ",
+    "apply.btn_kembali": "Kembali",
+    "apply.btn_kirim": "Kirim Lamaran",
+    "apply.btn_lanjut": "Lanjut",
+    "apply.file_too_big": "File terlalu besar (maks 2MB)",
+    "apply.ijazah_label": "Ijazah",
+    "apply.kk_label": "Kartu Keluarga (KK)",
+    "apply.ktp_label": "KTP",
+    "button.save_changes": "Simpan Perubahan",
+    "candidate.form_gender": "Gender",
+    "changepass.ok": "Password berhasil diganti! Gunakan password baru saat login berikutnya.",
+    "cvmini.pilih_pendidikan": "Pilih pendidikan…",
+    "ui.add_fav": "Simpan ke koleksi favorit",
+    "ui.add_stage": "Tambah Tahapan",
+    "ui.age_range": "RENTANG USIA",
+    "ui.ai_copilot": "AI HR Copilot",
+    "ui.ai_headhunter": "AI Headhunter (Match)",
+    "ui.ai_interview_done_btn": "Selesai & Kirim Hasil ke Admin",
+    "ui.ai_interview_done_text": "SELESAI",
+    "ui.ai_interview_not_started": "Wawancara belum dimulai \u2014 jawab dulu beberapa pertanyaan ya",
+    "ui.ai_interview_sent": "Hasil wawancara terkirim ke admin \u2705",
+    "ui.ai_interview_summarizing": "\ud83d\udd0d Jeklin merangkum hasil wawancara\u2026",
+    "ui.catatan_ph": "Catatan bebas: dicicil, refund bila kaisha batal, training wajib, dll",
+    "ui.confirm_offer_n": "Kirim tawaran WA ke {n} kandidat ini?",
+    "ui.custom_item_label": "Item custom",
+    "ui.custom_item_ph": "Item custom…",
+    "ui.delete_stage": "Hapus tahapan",
+    "ui.edu_diploma": "Diploma (D3/D4)",
+    "ui.edu_none": "Tanpa syarat pendidikan",
+    "ui.edu_s1": "S1",
+    "ui.edu_sma": "SMA/SMK",
+    "ui.empty_rincian": "Belum ada rincian.",
+    "ui.experience_skills": "PENGALAMAN / KEAHLIAN / SIM",
+    "ui.found_n": "Kandidat ditemukan: {n}",
+    "ui.gender_all": "Semua Gender",
+    "ui.interview_sim": "Simulator 面接 (Mentsetsu)",
+    "ui.iv_err_disconnect": "Koneksi terputus. Silakan kirim ulang jawabanmu.",
+    "ui.iv_err_summarize": "⚠️ Gagal merangkum hasil: {e}",
+    "ui.iv_greet_fallback": "Konnichiwa **{name}**-san! Saya Jeklin-sensei.\nKetik jawabanmu untuk memulai latihan wawancara ya!",
+    "ui.iv_res_bio_fields": "🧬 Data biodata terekam: {n} field",
+    "ui.iv_res_rekom": "💡 Rekomendasi: ",
+    "ui.iv_res_sent_fail": "⚠️ Gagal kirim hasil ke admin.",
+    "ui.iv_res_sent_ok": "✅ Hasil terkirim ke admin — siap di-update ke biodata.",
+    "ui.iv_res_skor": "⭐ Skor: ",
+    "ui.iv_res_title": "📊 Hasil Wawancara",
+    "ui.iv_send": "Kirim",
+    "ui.iv_typing": "Sensei sedang mengetik evaluasi…",
+    "ui.kw_ph": "Cth: pengalaman Jepang, caregiver…",
+    "ui.latest_photo": "PAS PHOTO TERBARU (JPG/PNG)",
+    "ui.master_update_hint": "Perbarui data Anda di bawah ini agar perusahaan tertarik. Lebih cepat dan mudah!",
+    "ui.match_hint": "Atur kriteria di atas lalu klik Mulai Pencarian Spesifik.",
+    "ui.max_weight": "BERAT (MAKSIMAL)",
+    "ui.min_education": "PENDIDIKAN MINIMAL",
+    "ui.min_height": "TINGGI (MINIMAL)",
+    "ui.no_match": "Tidak ada kandidat yang memenuhi kriteria spesifik ini. Coba longgarkan rentang usia / fisiknya.",
+    "ui.offer_msg_template": "Halo {nama} 👋\n\nBerdasarkan pencocokan data di sistem ASJ, ada *loker baru* yang cocok untuk Anda!\n\nKode loker: *{job_code}*\n\nJika berminat, silakan login ke dashboard dan segera daftar:\n🔗 {link_grup}\n\nSemangat! 🇯🇵",
+    "ui.open_rincian_editor": "Buka Editor Rincian",
+    "ui.preview_detail": "PRATINJAU (yang akan tampil di popup Detail)",
+    "ui.remove_fav": "Hapus dari koleksi favorit",
+    "ui.require_jft": "Wajib JFT/JLPT",
+    "ui.require_ssw": "Wajib SSW",
+    "ui.rincian_biaya": "Rincian Biaya & Tahapan",
+    "ui.rincian_builder_hint": "Klik pilihan yang mau dipakai, isi tahapan & catatan. Hasilnya otomatis tampil lengkap di popup Detail loker publik.",
+    "ui.save_cv_mini": "Simpan CV Mini",
+    "ui.save_rincian": "SIMPAN RINCIAN",
+    "ui.save_share": "Simpan Dokumen",
+    "ui.search_criteria": "KRITERIA PENCARIAN KANDIDAT",
+    "ui.send_offer_all": "Kirim Tawaran ke Semua Kandidat",
+    "ui.share_card_hint": "Pilih berkas yang tampil di share view — menyesuaikan permintaan TSK. Centang \"Semua file folder\" utk ikut menampilkan SIM/KTP/ijazah dll.",
+    "ui.share_copy_link": "Copas Link",
+    "ui.share_doc_akte": "AKTE",
+    "ui.share_doc_all": "Semua file folder (SIM dll)",
+    "ui.share_doc_cv": "CV",
+    "ui.share_doc_ijazah": "IJAZAH",
+    "ui.share_doc_jft": "Sertif JFT",
+    "ui.share_doc_kk": "KK",
+    "ui.share_doc_ktp": "KTP",
+    "ui.share_doc_sim_a": "SIM A",
+    "ui.share_doc_ssw": "Sertif SSW",
+    "ui.share_preview_btn": "Preview Share View",
+    "ui.share_preview_close": "Tutup",
+    "ui.share_preview_hint": "Tampilan TSK (share view) loker ini — tanpa menutup modal.",
+    "ui.sifting_db": "MENYISIR DATABASE…",
+    "ui.stage_amount_label": "Nominal tahapan",
+    "ui.stage_example": "Contoh: TTD KONTRAK : 6 JT — otomatis jadi langkah 1, 2, 3…",
+    "ui.stage_name_label": "Nama tahapan",
+    "ui.stage_name_ph": "Nama tahapan (mis. TTD KONTRAK)",
+    "ui.star_hint": "Bintang ☆ = simpan item ke koleksi favorit (tersimpan di database, tinggal pakai di loker berikutnya). Bintang ★ = sudah tersimpan, klik untuk hapus dari koleksi.",
+    "ui.start_specific_search": "Mulai Pencarian Spesifik",
+    "ui.summary_empty": "Klik untuk isi rincian biaya",
+    "ui.target_job": "Loker Tujuan:",
+    "ui.toast_copy_text_failed": "Gagal menyalin teks",
+    "ui.toast_cvmini_updated": "CV Mini Berhasil Diperbarui!",
+    "ui.toast_fav_added": "Favorit ditambahkan!",
+    "ui.toast_fav_remove_failed": "Gagal hapus favorit.",
+    "ui.toast_fav_save_failed": "Gagal simpan favorit.",
+    "ui.toast_feature_locked": "Fitur ini eksklusif untuk Siswa ASJ (VIP / Kelas LPK). Hubungi Admin untuk akses.",
+    "ui.toast_job_created": "Loker berhasil ditambahkan!",
+    "ui.toast_job_updated": "Loker berhasil diperbarui!",
+    "ui.toast_session_invalid_relogin": "Sesi tidak valid, harap login ulang.",
+    "ui.toast_share_saved": "Konfigurasi share tersimpan!",
+    "ui.toast_config_saved": "Pengaturan tersimpan!",
+    "ui.toast_announcement_saved": "Pengumuman tersimpan!",
+    "ui.toast_schedule_saved": "Jadwal tersimpan!",
+    "ui.toast_schedule_deleted": "Jadwal dihapus!",
+    "ui.toast_template_deleted": "Template dihapus!",
+    "ui.confirm_delete_schedule": "Hapus jadwal ini?",
+    "ui.total_cost": "TOTAL BIAYA JOB",
+    "ui.total_cost_ph": "Contoh: 25 JT",
+    "ui.update_cv_template": "UPDATE TEMPLATE CV (Biarkan kosong jika tidak ganti)",
+    "ui.update_pamflet": "UPDATE PAMFLET (Biarkan kosong jika tidak ganti)",
+    "ui.upload_job": "UNGGAH DATA LOKER BARU",
+    "ui.uploading_job": "MENGUNGGAH…",
+    "ui.years_short": "th",
+    "ui.your_schedule": "Jadwalmu",
+    "ui.interview_practice": "Latihan Interview",
+    "ui.esign_naitei": "E-Sign & Naitei",
+    "ui.info_lain": "Info Lainnya",
+    "ui.payment_stage": "Tahap Pembayaran",
+    "ui.open_link": "Buka Link / Gabung Grup",
+    "ui.not_applied_general": "Belum Lamar (Umum)",
+    "ui.modal_edit_job_title": "Edit Detail Loker",
+    "ui.pilih_loker": "Pilih Loker:",
+    "ui.admin_eval_msg": "Pesan / Evaluasi Admin:",
+    "ui.toast_data_not_found": "Data tidak ditemukan!",
+    "ui.profile_silver_next": "Silver Crown! Selesaikan Master Profile",
+    "ui.save_publish": "Simpan & Publish",
+    "ui.wa": "WA",
+    "ui.invite_class_title": "Undangan Grup WhatsApp Kelas",
+    "ui.invite_class_desc": "Tempel daftar orang tua/wali (Nama|WA), isi link grup & jeda, lalu kirim. Pesan berisi link undangan dikirim satu per satu via Fonnte.",
+    "ui.paste_list_label": "DAFTAR ORANG TUA/WALI (Nama|WA)",
+    "ui.paste_list_placeholder": "Nama Orang Tua/Wali|628xxxxxxxxxx",
+    "ui.paste_list_hint": "1 baris per orang tua. Format:",
+    "ui.paste_list_hint2": "(bisa dari Excel/WA; 0xx/8xx otomatis jadi 62xx).",
+    "ui.group_link_label": "LINK GRUP WHATSAPP",
+    "ui.interval_label": "JEDA ANTAR PESAN (DETIK)",
+    "ui.message_label": "TEMPLATE PESAN",
+    "ui.message_hint": "Placeholder:",
+    "ui.message_hint2": "= nama siswa,",
+    "ui.message_hint3": "= link grup di atas.",
+    "ui.message_preview": "PRATINJAU PESAN PERTAMA",
+    "ui.list_preview_n": "{n} orang terbaca",
+    "ui.variant_count_n": "{n} varian pesan (bergiliran)",
+    "ui.start_send_invite": "Mulai Kirim Undangan",
+    "ui.start_invite": "Mulai Kirim Undangan",
+    "ui.sending": "Mengirim...",
+    "ui.waiting_result": "Menunggu hasil pengiriman...",
+    "ui.group_link_placeholder": "https://chat.whatsapp.com/...",
+    "ui.toast_invites_queued": "Berhasil mengantrekan {n} undangan (job {id}). Pengiriman diproses bertahap dan hasil akan muncul otomatis.",
+    "ui.toast_invalid_rows_n": "{n} baris tidak valid (format Nama|628xxx) — dikeluarkan.",
+    "ui.toast_no_valid_wa": "Tidak ada nomor WA valid.",
+    "ui.toast_confirm_send_n": "Kirim undangan ke {n} orang tua/wali?",
+    "ui.toast_invite_send_failed": "Gagal mengirim undangan: ",
+    "ui.toast_invites_done_n": "Selesai! Berhasil memproses {n} undangan.",
+    "ui.toast_group_link_required": "Link Grup wajib diisi!",
+    "ui.toast_msg_empty": "Pesan tidak boleh kosong!",
+    "ui.toast_eval_note_saved": "Catatan evaluasi tersimpan!",
+    "ui.toast_conn_failed": "Koneksi gagal: ",
+    "ui.toast_network_error": "Jaringan Error",
+    "ui.toast_cand_saved": "Kandidat tersimpan! ",
+    "ui.toast_cand_removed_job": "Kandidat berhasil dikeluarkan dari Job",
+    "ui.toast_offer_sent_n": "Berhasil menawarkan pekerjaan ke {n} Kandidat!",
+    "ui.toast_offer_send_failed": "Gagal mengirim tawaran: ",
+    "ui.toast_no_cand_in_job": "Tidak ada kandidat di Job ini.",
+    "ui.toast_no_cand_offer": "Tidak ada kandidat untuk ditawari",
+    "ui.toast_cand_not_found": "Data kandidat tidak ditemukan",
+    "ui.toast_tsk_copied": "Teks TSK disalin ke clipboard!",
+    "ui.toast_csv_downloaded": "{n} kandidat diunduh ke CSV.",
+    "ui.toast_excel_downloaded": "{n} kandidat diunduh ke Excel.",
+    // Hapus massal Mail Inbox (#15) — teks persis legacy (`cloudinary.js`).
+    "ui.delete_mail": "Hapus lamaran",
+    "ui.delete_selected_mail": "Hapus Terpilih",
+    "ui.select_mail_first": "Pilih dulu baris yang mau dihapus.",
+    "ui.confirm_delete_mail": "Hapus data lamaran ini secara permanen?",
+    "ui.confirm_delete_mail_selected": "Hapus {n} lamaran terpilih? Data kandidat & master TIDAK ikut terhapus.",
+    "ui.toast_mail_deleted_n": "{n} lamaran terpilih berhasil dihapus.",
+    // Composer alasan penolakan (#12) — teks persis legacy (`i18n/locales/id/ui.js`).
+    "ui.reject_app": "Reject Lamaran",
+    "ui.reject_reason_hint": "Tulis alasan penolakan. Pesan ini akan muncul di Dashboard Kandidat.",
+    "ui.reject_reason_ph": "Contoh: Dokumen KTP tidak terbaca. Mohon unggah ulang.",
+    "ui.set_fail": "Set status GAGAL",
+    "ui.toast_rejected_n": "Lamaran {n} ditolak. Alasan sudah dikirim ke kandidat.",
+    "ui.toast_monthly_report": "Laporan Bulanan",
+    "ui.toast_sync3_success": "Profil kandidat berhasil disimpan!",
+    "ui.berkas_center": "Pusat Pemberkasan",
+    "ui.berkas_progress": "Progres Pemberkasan",
+    "ui.candidate_label": "Kandidat:",
+    "ui.stage1_short": "Pemberkasan Tahap 1 (LoLos User)",
+    "ui.stage1_desc": "Silakan unggah dokumen di bawah ini.",
+    "ui.stage2_short": "Pemberkasan Tahap 2 (Visa & E-ID)",
+    "ui.stage2_desc": "Mohon unggah dokumen hasil scan PDF asli.",
+    "ui.cand_docs_supabase": "Dokumen Pelamar (Supabase)",
+    "ui.doc_preview": "Pratinjau Dokumen",
+    "ui.upload": "UPLOAD",
+    "ui.done_save": "Selesai (Simpan)",
+    "ui.doc_preview_title": "Preview Dokumen",
+    "ui.preview_unavailable": "Tidak bisa dipratinjau",
+    "ui.preview_loading": "Memuat pratinjau...",
+    "ui.download_qr": "DOWNLOAD GAMBAR QR",
+    "ui.toast_pick_file_first": "Pilih file dulu sebelum upload.",
+    "ui.toast_pick_min_one": "Silakan pilih minimal 1 file.",
+    // Guard ekstensi pemberkasan (#10 parity legacy cekEkstensiFile) — teks
+    // persis legacy (`i18n/locales/id/ui.js`).
+    "ui.toast_file_ext_bad": "{nama} format tidak diizinkan. Gunakan PDF, gambar (JPG/PNG/WebP), Excel, Word, atau PPT.",
+    "ui.toast_file_too_big": "{nama} terlalu besar (maks {mb} MB) — base64 +30% melewati limit server.",
+    "ui.toast_uploaded_n": "Berhasil mengunggah {n} dokumen!",
+    "ui.toast_docs_exclaim": " dokumen!",
+    "ui.toast_upload_failed": "Gagal mengunggah file: ",
+    "ui.toast_upload_storage_ok": "terupload ke Storage ✓",
+    "ui.uploading_short": "Mengupload...",
+    "ui.uploading_files": "Mengunggah {n} File...",
+    "ui.uploading_server": "MENGUNGGAH KE SERVER...",
+    "ui.berkas_tersimpan": "Berkas Sudah Tersimpan",
+    "ui.upload_berkas_tahap_1": "Upload Berkas Tahap 1",
+    "ui.upload_berkas_tahap_2": "Upload Berkas Tahap 2",
+    "ui.form_other_docs": "UPLOAD DOKUMEN LAINNYA (Opsional)",
+    "ui.form_other_docs_type": "JENIS DOKUMEN",
+    "ui.form_other_docs_file": "FILE (PDF/Gambar)",
+    "ui.add_doc": "Tambah Dokumen",
+    "ui.remove_doc": "Hapus Baris",
+    "candidate.biodata_title": "FORM BIODATA KTKLN & VISA",
+    "candidate.biodata_desc": "Mohon isi sesuai KTP, JFT, SSW & Paspor.",
+    "candidate.bio_personal": "DATA PRIBADI",
+    "candidate.bio_email": "EMAIL AKTIF",
+    "candidate.bio_pob": "TEMPAT LAHIR",
+    "candidate.form_dob": "TANGGAL LAHIR",
+    "candidate.bio_address": "ALAMAT LENGKAP KTP",
+    "candidate.bio_father": "NAMA AYAH",
+    "candidate.bio_father_dob": "TTL AYAH",
+    "candidate.bio_mother": "NAMA IBU KANDUNG",
+    "candidate.bio_mother_dob": "TTL IBU",
+    "candidate.bio_passport": "PASPORT & COE",
+    "candidate.bio_pass_num": "NO. PASPORT",
+    "candidate.bio_coe_num": "NO. COE",
+    "candidate.bio_pass_issue": "TGL TERBIT PASPORT",
+    "candidate.bio_pass_exp": "TGL EXPIRED PASPORT",
+    "candidate.bio_comp_name": "NAMA PERUSAHAAN",
+    "candidate.bio_shacou": "NAMA SHACOU",
+    "candidate.bio_comp_web": "WEBSITE",
+    "candidate.bio_comp_address": "ALAMAT PERUSAHAAN",
+    "ui.family_data": "DATA KELUARGA",
+    "ui.company_data": "DATA PERUSAHAAN",
+    "ui.company_phone": "TELP PERUSAHAAN",
+    "ui.passport_city": "KOTA TERBIT PASPORT",
+    "ui.saving": "Menyimpan...",
+    "ui.uploading": "Mengunggah...",
+    "ui.save_biodata": "Simpan Biodata",
+    "ui.toast_biodata_saved": "Biodata berhasil disimpan!",
+    "ui.toast_failed_prefix": "Gagal: ",
+    "ui.toast_network_error_prefix": "Gagal terhubung: ",
+    "ui.toast_target_invalid": "Target tidak valid.",
+    "ui.uploaded_view": "\u2713 Lihat",
+    "ui.not_yet": "Belum",
+    "ui.upload_locked": "Upload berkas belum terbuka untuk tahapan Anda saat ini. Silakan hubungi admin.",
+    "candidate.form_kk": "1. KK (Scan PDF)",
+    "candidate.form_akte": "2. AKTE (Scan PDF)",
+    "candidate.form_sd": "3. IJAZAH SD (Scan PDF)",
+    "candidate.form_smp": "4. IJAZAH SMP (Scan PDF)",
+    "candidate.form_sma": "5. IJAZAH SMA (Scan PDF)",
+    "candidate.form_univ": "6. IJAZAH UNIVERSITAS (Scan PDF)",
+    "candidate.form_passport": "7. PASPORT (Scan PDF)",
+    "candidate.form_mcu": "8. MCU / KESEHATAN (Scan PDF)",
+    "candidate.form_contract": "9. KONTRAK KERJA (Scan PDF)",
+    "candidate.form_cert_japan": "10. CERTIFICATE JAPAN (Ex Japan)",
+    "candidate.form_ktp": "11. KTP DEPAN BELAKANG (PDF)",
+    "candidate.form_photo": "12. PAS FOTO STUDIO (JPG)",
+    "candidate.form_parent_permit": "1. SURAT IJIN ORTU",
+    "candidate.form_cpmi": "2. PERNYATAAN CPMI",
+    "candidate.form_marital": "3. STATUS PERKAWINAN",
+    "candidate.form_health_cert": "4. SURAT SEHAT PUSKESMAS",
+    "candidate.form_bpjs": "5. BPJS KETENAGAKERJAAN",
+    "candidate.form_psikotes": "6. HASIL PSIKOTES",
+    "ui.doc4_health": "4. SEHAT PUSKESMAS",
+    "ui.doc7_mcu": "7. MCU (Scan PDF)",
+    "ui.doc8_contract": "8. KONTRAK KERJA (PDF)",
+    "ui.doc9_cert_japan": "9. CERTIFICATE JAPAN",
+    "ui.doc10_ktp": "10. KTP (PDF)",
+    "ui.toast_save_failed": "Gagal simpan: ",
+    "dash.status": "Status Tahapan",
+    "toast.session_expired": "Sesi expired. Silakan login kembali.",
+    "toast.session_invalid": "Sesi tidak valid. Silakan login kembali.",
+    "toast.network_error": "Gagal terhubung ke server.",
+    "toast.saved": "Data berhasil disimpan!",
+    "toast.submitted": "Data berhasil dikirim!",
+    "toast.deleted": "Data berhasil dihapus.",
+    "toast.login_success": "Login berhasil!",
+    "toast.logout_success": "Logout berhasil.",
+    "toast.validation_error": "Mohon lengkapi field yang benar.",
+    "toast.upload_success": "File berhasil diupload!",
+    "toast.upload_failed": "Gagal upload file. Coba lagi.",
+    "toast.uploading": "Mengunggah...",
+    "toast.upload_revise_success": "File revisi berhasil diupload!",
+    "toast.upload_revise_failed": "Gagal upload revisi",
+    "toast.db_unconfigured": "Supabase belum dikonfigurasi",
+    "toast.feature_locked": "Fitur terkunci untuk akun ini.",
+    "toast.copy_success": "Berhasil disalin!",
+    "toast.fetch_failed": "Gagal memuat data. Tekan Muat Ulang.",
+    "error.wa_invalid": "Nomor WA tidak valid",
+    "error.email_invalid": "Format email tidak valid",
+    "error.password_short": "Password minimal 4 karakter",
+    "error.password_space": "Password tidak boleh spasi",
+    "error.name_short": "Nama minimal 2 karakter",
+    "error.gender_required": "Pilih jenis kelamin",
+    "error.age_range": "Usia harus 16-50 tahun",
+    "error.height_range": "Tinggi harus 130-220 cm",
+    "error.weight_range": "Berat harus 35-150 kg",
+    "error.address_short": "Alamat minimal 5 karakter",
+    "error.required": "Field ini wajib diisi",
+        "button.detail": "Detail",
+    "button.more": "Muat Lebih Banyak",
+    "button.apply": "Lamar Sekarang",
+    "table.code": "Kode Job",
+    "table.job": "Nama Pekerjaan",
+    "table.status": "Status",
+    "table.req": "Persyaratan & Ket.",
+    "table.action": "Aksi Pelamar",
+    "table.tsk": "TSK",
+    "table.field_location": "Lokasi",
+    "table.candidate_count": "Pelamar",
+    "table.stage_status": "Tahapan",
+    "table.action_db": "Aksi DB",
+    "table.admin_action": "Aksi Admin",
+    "table.delete": "Hapus",
+    "table.job_code": "Kode Job",
+    "table.candidate_id": "ID Kandidat",
+    "table.upload_date": "Tanggal",
+    "admin.view_full": "Tampilan Lengkap",
+    "admin.view_simple": "Tampilan Sederhana",
+    "admin.refresh_mail": "Refresh MAIL",
+    "admin.input_manual": "Input Manual",
+    "admin.export_csv": "Export CSV",
+    "admin.export_excel": "Export Excel",
+    "admin.filter": "Filter:",
+    "admin.catatan_admin": "Catatan Admin",
+    "admin.upload_format_cv": "UPLOAD FORMAT CV/EXCEL (Opsional)",
+    "admin.upload_pamflet": "UPLOAD PAMFLET (Opsional)",
+    "admin.syarat_dokumen": "SYARAT UPLOAD DOKUMEN",
+    "admin.keterangan_publik": "KETERANGAN PUBLIK (Opsional)",
+    "ui.jobs_suffix": "loker",
+    "login.title_kandidat": "Login Pelamar",
+    "ai_cv.verify_account": "Verifikasi Akun Kandidat",
+    "ai_cv.login_required_desc": "Login diperlukan untuk chat & menyimpan CV — data CV yang sudah diisi tidak akan hilang.",
+    "ai_cv.hrd_tagline": "HRD ASJ (Boss's Daughter)",
+    "ai_cv.loading_draft": "Memuat CV kandidat\u2026",
+    "siswa.session_admin_only": "Sesi tidak valid (khusus admin)",
+    "siswa.login_admin_hint": "Login sebagai admin untuk melihat daftar siswa terdaftar.",
+    "siswa.load_failed": "Gagal memuat data",
+    "siswa.gender_unfilled": "Gender belum diisi",
+    "siswa.title_registered": "Daftar Siswa Terdaftar",
+    "table.full_name": "Nama Lengkap",
+    "table.job_applied": "Job Dilamar",
+    "table.stage_and_status": "Tahapan & Status",
+    "table.admin_notes": "Catatan Admin",
+    "table.doc_folder": "Folder Berkas",
+    "table.action_review": "Aksi (Review)",
+    "table.gender": "JK",
+    "table.address": "Alamat",
+    "admin.candidate_database": "Database Pelamar",
+    "admin.loading_candidates": "Memuat data pelamar...",
+    "admin.no_candidates": "Belum ada pelamar.",
+    "admin.of": "dari",
+    "admin.candidates": "kandidat",
+    "admin.title_input_loker": "Form Input Loker Baru",
+    "admin.internal_db_info": "Info DB Internal",
+    "admin.tsk_pengurus": "TSK PENGURUS",
+    "admin.tahapan_internal": "TAHAPAN INTERNAL",
+    "admin.kuota_dibutuhkan": "KUOTA DIBUTUHKAN (Cth: 3 Org)",
+    "admin.kategori_bidang": "KATEGORI BIDANG",
+    "admin.nama_pekerjaan": "NAMA PEKERJAAN (Judul Loker)",
+    "admin.gender_label": "GENDER",
+    "admin.penempatan_lokasi": "PENEMPATAN LOKASI (Pilih Checkbox)",
+    "admin.syarat_kandidat": "SYARAT KANDIDAT (Pilih Checkbox)",
+    "admin.cth_25_jt": "(Cth: 25 JT)",
+    "admin.mail_inbox": "Form Mail Inbox",
+    "admin.no_mail_found": "Tidak ada mail ditemukan.",
+    "admin.confirm_reject_application": "Tolak lamaran ini?",
+    "admin.tab_config_title": "Pengaturan Sistem (Dropdown)",
+    "admin.sys_config_desc": "Kelola pilihan dropdown yang akan muncul di formulir (menggantikan Sheet SYS CONFIG).",
+    "admin.db_migration_auto": "Migrasi Database (Otomatis)",
+    "admin.run_migration": "Jalankan Migrasi",
+    "admin.marquee_announcement": "Pengumuman Berjalan (Live)",
+    "admin.save_and_publish": "Simpan & Tayangkan",
+    "admin.options_suffix": "pilihan",
+    "admin.more_suffix": "lainnya",
+    "status.waiting": "Menunggu",
+    "status.review": "Review",
+    "status.pass": "Lulus",
+    "status.fail": "Gagal",
+    "status.all": "SEMUA",
+    "button.view": "Lihat",
+    "button.pass": "Lulus",
+    "button.review": "Review",
+    "button.reject": "Gagal",
+    "button.back_to_portal": "Kembali ke Portal",
+    "master.step_personal": "Data Diri",
+    "master.step_medical": "Medis & Wawancara",
+    "master.step_history": "Riwayat",
+    "master.step_family": "Keluarga",
+    "master.step_documents": "Dokumen",
+    "form.connected_wa": "Form terhubung ke WA",
+    "form.enter_password_desc": "Masukkan password akun kandidat Anda untuk mengisi / memperbarui data.",
+    "ui.tab_loker": "Lowongan Loker",
+    "ui.tab_layanan": "Program & Layanan ASJ",
+    "landing.class_badge": "Dibuka Kelas Baru",
+    "landing.class_title": "Penerimaan Siswa Angkatan K",
+    "landing.class_subtitle": "Mulai Bulan Oktober 2026",
+    "landing.class_desc": "Wujudkan mimpimu berkarir di Jepang lewat jalur resmi. Tersedia program Tokutei Ginou (SSW) dan Magang (SO Swasta) dengan kuota eksklusif terbatas 25-30 anak per angkatan agar belajar lebih fokus.",
+    "landing.class_dana_title": "Tersedia Dana Talang",
+    "landing.class_dana_desc": "Biaya keberangkatan bisa ditalangi TANPA BUNGA / RIBA. Cukup jaminan sertifikat/dokumen yang aman & bisa dicek kapan saja di LPK. Uang kembali full jika ada pembatalan sepihak dari Kaisha Jepang (kecuali MCU).",
+    "landing.class_fee_title": "Rincian Biaya",
+    "landing.class_fac_title": "Fasilitas Asrama Gratis",
+    "landing.class_btn_wa": "Grup WA",
+    "landing.class_btn_cek": "Cek Data",
+    "landing.class_btn_form": "Form Daftar Siswa",
+    "landing.visa_title": "Pengurusan Visa",
+    "landing.visa_subtitle": "Tokutei Ginou & Magang",
+    "landing.visa_desc": "Menerima pembuatan dokumen dan Visa Jepang (TG & Magang). Melayani proses pemberkasan untuk kandidat di area/domisili Surabaya, Jakarta, dan Medan.",
+    "landing.visa_btn": "Konsultasi Visa",
+    "landing.exam_title": "Pendaftaran Ujian",
+    "landing.exam_subtitle": "JFT Basic & SSW Prometric",
+    "landing.exam_desc": "Solusi cepat dapat jadwal ujian! Kami bantu pendaftaran resmi akun Prometric Anda untuk seluruh titik lokasi di Indonesia (Bandung, Jakarta, Surabaya, Bali, dll).",
+    "landing.exam_btn": "Booking Jadwal Ujian",
+    "landing.maps_title": "Kunjungi LPK Amanah Sakura Japan",
+    "landing.maps_btn": "Buka Google Maps",
+  "landing.class_fac_kasur": "Kasur",
+  "landing.class_fac_wifi": "WiFi",
+  "landing.class_fac_dapur": "Dapur",
+  "landing.class_fac_cuci": "Cuci",
+  "landing.class_fac_motor": "Motor",
+  "landing.class_fac_or": "OR",
+  "landing.class_fac_note": "Hanya Biaya Asrama Rp 50.000/Bulan",
+  "landing.visa_list_1": "Proses Cepat & Terpercaya",
+  "landing.visa_list_2": "Legal & Resmi sesuai Prosedur",
+  "landing.visa_list_3": "Pendampingan Penuh sampai Berangkat",
+  "landing.exam_list_1": "Jadwal fleksibel",
+  "landing.exam_list_2": "Lokasi seluruh Indonesia",
+  "landing.exam_list_3": "Bimbingan persiapan ujian",
+  
+  // ── Profil perusahaan: hero + pita CTA (landing page L2) ──────────────
+  // Namespace `profile` is declared in the NS list of i18n.keys.test.ts, so every
+  // key below is validated against BOTH dictionaries. Values are either the
+  // verbatim company-profile text or a proposed headline; the ones that are
+  // proposals are the only strings on this page an editor may rewrite freely.
+  "profile.hero_eyebrow": "PT AMANAH SAKURA JAPAN",
+  // Verbatim from the company profile (cover and letterhead). Not a proposal.
+  "profile.hero_tagline": "LET'S BUILD OUR FUTURE",
+  "profile.hero_title": "Karier ke Jepang, dimulai dari sini.",
+  "profile.hero_sub": "LPK pelatihan bahasa & budaya kerja Jepang di Ponorogo. Program, lowongan, dan pendampingan sampai siap berangkat — keberangkatan dijalankan bersama mitra LPK dan PT (SO).",
+  "profile.hero_cta_secondary": "Daftar sebagai Pelamar",
+  "profile.hero_chip_ssw": "SSW",
+  "profile.hero_chip_magang": "Magang",
+  "profile.hero_chip_penempatan": "Penempatan",
+  // The three hero stats are the ones the company profile actually proves:
+  // founded 2023 (deed 15 Aug 2023), five placement sectors and four destination
+  // prefectures (pages 3, 13 and 14). The counts a mockup showed — 500+
+  // candidates, 200+ departures, 50+ partners — are NOT in the document and are
+  // deliberately absent; see docs/COMPANY_PROFILE_DATA.md §13.
+  "profile.stat_since": "Berdiri sejak",
+  "profile.stat_sectors": "Bidang penempatan",
+  "profile.stat_prefectures": "Prefektur di Jepang",
+  "profile.cta_title": "Siap memulai perjalanan ke Jepang?",
+  "profile.cta_sub": "Lihat lowongan yang tersedia atau daftar sebagai pelamar hari ini.",
+  "profile.cta_secondary": "Daftar Pelamar",
+
+  // ── Profil perusahaan: section (landing page L3) ──────────────────────
+  // Values MUST match the `text` fallback in src/lib/companyProfile.ts verbatim.
+  // A mismatch is not a gate failure — it is a visible swap, because
+  // translateDataLang() overwrites the server-rendered literal once the language
+  // store is read. The two files are the same content in two shapes.
+  //
+  // `profile.layanan_title` belongs to the `#layanan` section (index.astro:156),
+  // which no longer has a tab panel — it is a plain Section whose heading falls
+  // back to "Program & Layanan ASJ". MISSING SINCE e9317cf: the key was written
+  // at the call site and never added here. The fallback text is the source of the
+  // value, so the translated string and the no-JS literal cannot drift apart.
+  "profile.layanan_title": "Program & Layanan ASJ",
+  "profile.why_title": "Kenapa Jepang?",
+  "profile.why_desc": "Tiga alasan yang paling sering disebut kandidat.",
+  "profile.why_wage_title": "Gaji",
+  "profile.why_wage_body": "Upah minimum 15–25 juta per bulan, berbanding lurus dengan biaya hidup dibanding Indonesia.",
+  "profile.why_exp_title": "Pengalaman dan tantangan baru",
+  "profile.why_exp_body": "Gaya hidup, budaya, dan kedisiplinan yang berbeda dari Indonesia.",
+  "profile.why_season_title": "Kehidupan empat musim",
+  "profile.why_season_body": "Musim semi, panas, gugur, dan dingin — Indonesia hanya punya dua.",
+  "profile.why_tip": "Tekanan kerja di Jepang lebih besar: pilih pekerjaan sesuai kemampuan yang paling dikuasai, dan galilah bahasa Jepang sedalam mungkin.",
+  "profile.prog_title": "Program ASJ",
+  "profile.prog_desc": "Dua jalur resmi ke Jepang, plus pelatihan bahasanya.",
+  "profile.prog_magang_title": "Magang",
+  "profile.prog_magang_body": "Pendampingan dari pendaftaran sampai keberangkatan.",
+  "profile.prog_tg_title": "Tokutei Ginou",
+  "profile.prog_tg_body": "Perawat Lansia (Kaigo), Pengolahan Makanan, Restoran, Pertanian, Peternakan.",
+  "profile.prog_bahasa_title": "Bahasa Jepang",
+  "profile.prog_bahasa_body": "Pelatihan bahasa, keterampilan, dan pengenalan budaya Jepang.",
+  "profile.prog_price_label": "Biaya program",
+  "profile.prog_payment": "Bisa dicicil, dan tersedia dana talang untuk biaya keberangkatan.",
+  "profile.prog_includes_title": "Sudah termasuk",
+  "profile.prog_inc_module": "Modul Pembelajaran & Kamus",
+  "profile.prog_inc_uniform": "Seragam Lembaga",
+  "profile.prog_inc_dorm": "Asrama",
+  "profile.prog_inc_exam": "Ujian JFT & SSW masing-masing 1 kali",
+  "profile.step_title": "Bagaimana Prosesnya?",
+  "profile.step_desc": "Enam langkah dari pendaftaran sampai berangkat.",
+  "profile.step_reg_title": "Registration",
+  "profile.step_reg_body": "Pemeriksaan kesehatan, dokumen, dan mengisi form pendaftaran.",
+  "profile.step_train_title": "Training & Education",
+  "profile.step_train_body": "Pelatihan bahasa Jepang, keterampilan, dan pengenalan budaya Jepang.",
+  "profile.step_interview_title": "Interview",
+  "profile.step_interview_body": "Wawancara kerja dengan perusahaan Jepang.",
+  "profile.step_doc_title": "Employment Document",
+  "profile.step_doc_body": "Kepengurusan berkas di Indonesia.",
+  "profile.step_prep_title": "Document Preparing",
+  "profile.step_prep_body": "Pemeriksaan kesehatan (MCU) dan tanda tangan kontrak kerja, lalu kepengurusan berkas imigrasi Jepang (COE).",
+  "profile.step_go_title": "GO TO JAPAN",
+  "profile.step_go_body": "Pengurusan paspor, visa, dan EKTLN di Indonesia.",
+  "profile.req_title": "Persyaratan & Dokumen",
+  "profile.req_desc": "Pastikan semuanya siap sebelum mendaftar.",
+  "profile.req_age": "Pria/wanita, umur 18–28 tahun",
+  "profile.req_edu": "Pendidikan minimal SMA/SMK sederajat",
+  "profile.req_marital": "Belum atau sudah menikah",
+  "profile.req_body": "Tinggi badan minimal pria 160 cm, berat badan 50 kg",
+  "profile.req_health": "Sehat jasmani dan rohani",
+  "profile.req_tattoo": "Tidak bertato dan bertindik",
+  "profile.req_vision": "Tidak buta warna dan bebas TBC",
+  "profile.req_docs_title": "Berkas yang disiapkan",
+  "profile.doc_form": "Mengisi form yang sudah disediakan",
+  "profile.doc_consent": "Surat izin orang tua",
+  "profile.doc_ktp": "Scan/foto copy KTP",
+  "profile.doc_birth": "Scan/foto copy akta lahir",
+  "profile.doc_kk": "Scan/foto copy Kartu Keluarga",
+  "profile.doc_diploma": "Scan/foto copy ijazah (SD/MI, SMP/MTS, SMA/SMK)",
+  "profile.doc_photo": "Pas foto 3×4 sebanyak 2 lembar",
+  "profile.vision_title": "Visi & Misi",
+  "profile.vision_heading": "Visi",
+  "profile.vision_body": "Menjadikan PT AMANAH SAKURA JAPAN sebagai lembaga pendidikan yang profesional dan berkualitas yang dapat menghasilkan sumber daya manusia yang mampu berkompetisi di era global serta mampu menjawab tantangan sesuai dengan perkembangan ilmu pengetahuan dan teknologi melalui pengembangan pembelajaran Bahasa asing.",
+  "profile.mission_heading": "Misi",
+  "profile.mission_1": "Menyelenggarakan program pendidikan dan pelatihan bahasa Jepang secara profesional",
+  "profile.mission_2": "Mencetak sumber daya manusia yang terampil dan profesional",
+  "profile.mission_3": "Membangun kerja sama dengan dunia usaha dan industri di dalam dan luar negeri",
+  "profile.mission_4": "Membuka peluang bekerja di luar negeri agar terciptanya lapangan pekerjaan",
+  "profile.legal_title": "Legalitas & Izin Resmi",
+  "profile.legal_desc": "Badan hukum dan nomor pendaftaran yang bisa diperiksa.",
+  "profile.legal_form": "Badan hukum",
+  "profile.legal_sk": "SK Kemenkumham",
+  "profile.legal_deed": "Akta Notaris",
+  "profile.legal_regno": "Nomor pendaftaran",
+  "profile.legal_register": "Daftar Perseroan",
+  "profile.legal_seat": "Kedudukan",
+  // The LEGAL_FACTS values that are not identifiers — see the note on
+  // LEGAL_FACTS in companyProfile.ts for why exactly these three and not the
+  // other three. A legal description, a date with a month name, and a place.
+  "profile.legal_form_value": "Perseroan Terbatas (PT), Swasta Nasional",
+  "profile.legal_deed_value": "Nomor 09, 15 Agustus 2023 — Notaris Setya Budhi, S.H.",
+  "profile.legal_seat_value": "Kabupaten Ponorogo, Jawa Timur",
+  "profile.contact_located_value": "Kabupaten Ponorogo, Jawa Timur",
+
+  // Alamat jalan. Nilai `id` di sini adalah ALAMAT RESMI (yang ditulis di amplop);
+  // versi JP di kamus jp hanyalah bantuan baca. Lihat komentar CONTACT_ADDRESS
+  // di companyProfile.ts — alamat adalah NAME, bukan identifier, jadi ia ikut
+  // diterjemahkan; sedangkan email dan nomor telepon tidak.
+  "profile.contact_address_value": "Jl. Kyai Ageng Musakaf, Rw 03 Rt 03, Dukuh Ngujung, Desa Gandu Kepuh, Kec. Sukorejo, Kab. Ponorogo, Jawa Timur",
+  // Jam operasional — dijawab pemilik 2026-09-30 (COMPANY_PROFILE_DATA.md P-4).
+  // Dua kunci terpisah: yang satu JAM BUKA, yang lain apa yang terjadi DI LUAR
+  // jam itu. Digabung jadi satu kalimat akan mengubur "slow respon", padahal
+  // itulah yang perlu dipahami penelepon SEBELUM ia menelepon.
+  "profile.contact_hours": "Jam Operasional",
+  "profile.contact_hours_value": "Senin – Sabtu, 08.00 – 16.00 WIB",
+  "profile.contact_hours_note": "Tanggal merah / hari libur, dan di luar jam kerja: respons lebih lambat.",
+  "profile.fac_title": "Fasilitas & Dukungan",
+  "profile.fac_desc": "Yang kandidat dapatkan selama pelatihan.",
+  "profile.fac_class_title": "Kelas Bahasa Jepang",
+  "profile.fac_class_body": "Kelas tatap muka dengan pengajar bersertifikat JLPT N1.",
+  "profile.fac_office_title": "Ruang Kantor",
+  "profile.fac_office_body": "Kantor operasional di Ponorogo, Jawa Timur.",
+  "profile.fac_guest_title": "Ruang Tamu",
+  "profile.fac_guest_body": "Ruang penerimaan untuk wali dan calon peserta.",
+  "profile.fac_dorm_title": "Asrama",
+  "profile.fac_dorm_body": "Kasur, WiFi, dapur, tempat cuci, dan kendaraan operasional.",
+  "profile.fac_uniform_title": "Seragam & Modul",
+  "profile.fac_uniform_body": "Seragam lembaga serta modul pembelajaran dan kamus.",
+  "profile.fac_exam_title": "Ujian JFT & SSW",
+  "profile.fac_exam_body": "Masing-masing satu kali ujian, termasuk dalam biaya program.",
+  "profile.place_food": "Pengolahan Makanan",
+  "profile.place_farm": "Pertanian",
+  "profile.place_livestock": "Peternakan",
+  // The VALUES of the placement rows. These were hardcoded romanised strings
+  // until 2026-09-27 — see the `Fact.value` note in companyProfile.ts. A
+  // prefecture is a name, so it localises; the middle dot separates two
+  // prefectures and is the same glyph in both languages.
+  "profile.place_food_area": "Miyazaki · Okayama",
+  "profile.place_farm_area": "Miyazaki · Nagano",
+  "profile.place_livestock_area": "Kagoshima",
+  // The price. `juta` is a word and the reader may not parse it, so only the
+  // LABEL being translated (as it was) left the number unreadable.
+  "profile.prog_price": "6 JUTA",
+
+  // ── Penempatan Kami (R4, halaman 13 & 14) ─────────────────────────────
+  // The mockup filled this slot with TESTIMONIALS. The company profile
+  // contains none, so it shows what it DOES contain and can be checked:
+  // four prefectures read off the dated interview banners. Replacing
+  // invented quotes with provable evidence is the trade the spec asks for
+  // (docs/LANDING_PAGE_SPEC.md §4).
+  "profile.place_title": "Penempatan Kami",
+  "profile.place_desc": "Bidang dan prefektur tujuan yang tercatat pada dokumen perusahaan.",
+  "profile.place_note": "Nama prefektur ditulis dalam huruf Latin, sesuai dokumen resmi.",
+
+  // ── Mitra Kami (slot mitra MoU — model sponsor) ───────────────────────
+  // Owner's request 2026-09-27. ASJ is a small LPK without SO status, so the
+  // departure is executed by partner LPKs/PTs (SOs) under an MoU. This section
+  // shows WHERE that authority lives, which is the honest answer to "then who
+  // sends me?" — and the one place the network is visible to a prospective
+  // partner.
+  //
+  // The names WERE slots; the owner supplied the six MoU partners 2026-09-29, so
+  // each now has its own key. `profile.mitra_slot_pending` STAYS: it is the
+  // rendering for a slot with no name yet, and a seventh partner would take it —
+  // a key removed because nothing currently renders it is a key the next slot
+  // has to reinvent.
+  //
+  // The Indonesian value is the partner's own LEGAL NAME, not a translation:
+  // a company called "PT Flora Talent Indonesia" is that name in both languages.
+  // The JP dictionary carries the same string for the same reason a proper noun
+  // is not translated — see that file for the note.
+  "profile.mitra_title": "Mitra Kami",
+  "profile.mitra_desc": "Keberangkatan ke Jepang dijalankan bersama mitra LPK dan PT (SO) berikut.",
+  "profile.mitra_note": "Kami belum berstatus SO, sehingga keberangkatan peserta ke Jepang dilaksanakan oleh mitra LPK dan PT (SO) yang telah menandatangani MoU dengan kami.",
+  "profile.mitra_kind_gloss": "Keterangan: badge di bawah nama adalah STATUS IZIN keberangkatan (SO = Sending Organization, berwenang memberangkatkan), bukan bentuk badan hukum. Nama mitra tetap memakai sebutan yang mereka pakai sendiri, sehingga ada mitra yang berbunyi \"LPK\" namun berizin SO.",
+  "profile.mitra_cta_desc": "Ingin menjadi mitra penempatan (MoU) kami? Silakan hubungi kami melalui bagian Kontak di bawah.",
+  "profile.mitra_slot_pending": "Slot belum diisi",
+  "profile.mitra_1_name": "PT Flora Talent Indonesia",
+  "profile.mitra_2_name": "PT Human Mandiri Indonesia",
+  "profile.mitra_3_name": "LPK Japanesia",
+  "profile.mitra_4_name": "PT JIPA",
+  "profile.mitra_5_name": "LPK Jinzai Servis Indonesia",
+  "profile.mitra_6_name": "PT Hibiki Cendekia Mandala",
+
+  // ── Kata Alumni (testimonial model, added 2026-09-29) ──────────────────
+  // The review QUOTES are not here yet — they arrive with the owner's real
+  // reviews (see src/lib/testimonials.ts). These are the section's own labels.
+  "profile.review_title": "Kata Alumni",
+  "profile.review_desc": "Cerita peserta yang telah belajar dan berangkat bersama kami.",
+  "profile.review_count_from": "dari",
+  "profile.review_count_of": "ulasan di Google Maps",
+  "profile.review_open_maps": "Lihat di Google Maps",
+  "profile.review_cta_desc": "Sudah pernah belajar atau berangkat bersama kami? Bagikan cerita Anda melalui kontak di bawah.",
+  "profile.review_slot_pending": "Review belum tayang",
+  "profile.review_pending_author": "Menunggu review",
+
+  // ── FAQ (#faq) — ADDED 2026-09-29 ─────────────────────────────────────
+  // Every ANSWER below is transcribed from docs/COMPANY_PROFILE_DATA.md, the
+  // company's own printed profile. See src/lib/faq.ts for the per-entry source.
+  // ⚠ Do NOT add a question whose answer is not in that document — and in
+  // particular do not add the minimum-height figure, which is still contradictory
+  // between printed pages (§12 K-3) and is a selection criterion.
+  "profile.faq_title": "Pertanyaan Umum",
+  "profile.faq_desc": "Pertanyaan yang paling sering ditanyakan calon peserta, dijawab dari dokumen resmi lembaga.",
+  "profile.faq_q_cost": "Berapa biaya programnya?",
+  "profile.faq_a_cost": "Biaya program adalah 6 juta rupiah.",
+  "profile.faq_q_includes": "Biaya 6 juta itu untuk apa saja?",
+  "profile.faq_a_includes": "Mencakup empat hal: modul pembelajaran dan kamus, seragam lembaga, asrama, serta ujian JFT dan SSW masing-masing satu kali.",
+  "profile.faq_q_installment": "Apakah biayanya bisa dicicil?",
+  "profile.faq_a_installment": "Bisa. Pembayaran dapat dilakukan secara bertahap (dicicil).",
+  "profile.faq_q_bridge": "Bagaimana kalau belum ada biaya keberangkatan?",
+  "profile.faq_a_bridge": "Tersedia dana talang untuk membantu biaya keberangkatan.",
+  "profile.faq_q_requirements": "Apa syarat untuk ikut program?",
+  "profile.faq_a_requirements": "Usia 18–28 tahun, pendidikan minimal SMA/SMK sederajat, sehat jasmani dan rohani, serta tidak bertato dan tidak bertindik. Untuk tinggi badan minimum dan syarat lain, silakan hubungi kami karena ada ketentuan yang berbeda antar jalur program.",
+  "profile.faq_q_process": "Berapa lama prosesnya, dan tahapannya apa saja?",
+  "profile.faq_a_process": "Enam tahap: pendaftaran dan pemeriksaan dokumen, pelatihan bahasa dan budaya Jepang, wawancara kerja dengan perusahaan Jepang, pengurusan berkas di Indonesia, pemeriksaan kesehatan (MCU) dan tanda tangan kontrak beserta pengurusan COE, lalu keberangkatan ke Jepang.",
+
+  // ── Lowongan Ringkas (R2, rail) — REMOVED 2026-09-24 ───────────────────
+  // The `profile.mini_*` keys (`mini_title`, `mini_desc`, `mini_all`,
+  // `mini_cta`) were deleted together with the `#loker-ringkas` section and its
+  // `JobMiniList` primitive. Owner ruling: `/` is a company profile for
+  // MoU/business partners, not a job board. Do not restore the keys without
+  // restoring the section.
+
+  // ── Tentang Kami (S7, halaman 2) ──────────────────────────────────────
+  // The welcome is reproduced VERBATIM, spelling included. An official
+  // statement is not ours to tidy; correcting it needs the owner's approval
+  // (docs/COMPANY_PROFILE_DATA.md §3).
+  "profile.about_title": "Tentang Kami",
+  "profile.about_desc": "Lembaga pelatihan bahasa & budaya kerja Jepang di Ponorogo.",
+  "profile.about_welcome": "Kami berkomitmen meningkatkan kemampuan sumber daya manusia untuk memperdayakan diri sendiri dan mampu menghadapi dunia kerja dan untuk meningkatkan keahlian.",
+  "profile.about_p1": "PT Amanah Sakura Japan adalah LPK — Lembaga Pelatihan Kerja — yang berkedudukan di Kabupaten Ponorogo, Jawa Timur. Kami menyiapkan calon pekerja migran Indonesia lewat pelatihan bahasa Jepang, keterampilan kerja, dan pengenalan budaya Jepang, untuk jalur magang maupun Tokutei Ginou.",
+  "profile.about_p2": "Kami adalah LPK kecil dan belum berstatus SO (Sending Organization), sehingga belum berwenang memberangkatkan peserta ke Jepang secara langsung. Keberangkatan dan penempatan di Jepang dijalankan bersama jaringan mitra LPK dan PT (SO) yang telah kami ikat dengan perjanjian kerja sama (MoU). Peran kami adalah menyiapkan pesertanya sampai siap — mulai dari pendaftaran, pelatihan bahasa, ujian JFT dan SSW, hingga seluruh berkas — lalu menyerahkannya ke mitra SO yang memberangkatkan. Setiap tahap punya pengajarnya sendiri, dan struktur organisasi kami bisa diperiksa di bagian Tim.",
+  "profile.about_image_alt": "Gedung kantor PT Amanah Sakura Japan di Ponorogo, Jawa Timur",
+  "profile.about_caption": "Peserta dan staf di kantor LPK Amanah Sakura Japan — Ponorogo, Jawa Timur",
+  "profile.about_cta": "Tentang Program Kami",
+  // A short, unmissable statement of what ASJ is and is not. The owner's ruling
+  // (2026-09-27): the page must not imply ASJ sends workers to Japan directly.
+  // ASJ is a small LPK WITHOUT SO status; the departure is executed by the MoU
+  // partner SOs. Stated as its own line rather than buried in a paragraph,
+  // because it is the single fact a prospective partner or candidate most needs
+  // to read correctly, and a misreading here is the one that misleads.
+  "profile.about_so_note": "Kami belum berstatus SO. Keberangkatan ke Jepang dijalankan bersama mitra LPK dan PT (SO) yang bekerja sama dengan kami melalui MoU.",
+  "profile.about_so_note_label": "Status SO (Sending Organization)",
+
+  // ── Sejarah (S9, `#tentang`) ──────────────────────────────────────────
+  // ADDED because the brief for "Tentang Kami" asks for visi, misi, sejarah and
+  // tim, and the page had three of the four. Each entry carries its document
+  // reference, so a reader can verify the date rather than take it on faith.
+  "profile.history_1_title": "15 Agustus 2023 — Pendirian",
+  "profile.history_1_body": "PT Amanah Sakura Japan didirikan di Kabupaten Ponorogo berdasarkan Akta Notaris Nomor 09 tanggal 15 Agustus 2023, dibuat di hadapan Notaris Setya Budhi, S.H.",
+  "profile.history_2_title": "28 Agustus 2023 — Pengesahan Badan Hukum",
+  "profile.history_2_body": "Kementerian Hukum dan Hak Asasi Manusia Republik Indonesia mengesahkan pendirian badan hukum perseroan melalui keputusan AHU-0063921.AH.01.01.TAHUN 2023, dengan nomor pendaftaran 4023082735107914.",
+  "profile.history_3_title": "2023 — Pelatihan Berbasis Kompetensi",
+  "profile.history_3_body": "Lembaga menyelenggarakan Program Pelatihan Berbasis Kompetensi dengan judul Pelatihan Bahasa Jepang, dan menyiapkan pengajar bersertifikat JLPT N1 untuk membimbing peserta hingga siap bekerja di Jepang.",
+
+  // ── Galeri (R3) ───────────────────────────────────────────────────────
+  // Captions only. The `alt` text for each photo lives in src/lib/gallery.ts,
+  // because it describes one specific picture and cannot be a shared key — the
+  // same reason a licence number is not translatable.
+  "profile.gallery_title": "Galeri Kegiatan",
+  "profile.gallery_desc": "Suasana pelatihan, kantor, dan keberangkatan peserta.",
+  "profile.gal_gedung": "Kantor & peserta di Ponorogo",
+  "profile.gal_staf": "Tim pengajar dan pengurus",
+  "profile.gal_kelas": "Persiapan wawancara kerja",
+  "profile.gal_tamu": "Penyerahan dokumen peserta",
+  "profile.gal_siswa": "Angkatan peserta pelatihan",
+  "profile.gal_berangkat": "Pelepasan keberangkatan",
+  "profile.gal_n1": "Pengajar bersertifikat JLPT N1",
+  "profile.gal_layanan": "Peserta dengan dokumen",
+
+  // ── Tim & Kredensial (S10, halaman 8 dan 10) ─────────────────────────
+  "profile.team_title": "Tim & Kredensial",
+  "profile.team_desc": "Struktur organisasi dan kualifikasi pengajar kami.",
+  "profile.team_komisaris": "Komisaris",
+  "profile.team_direktur": "Direktur",
+  "profile.team_edu_manager": "Education & Training Manager",
+  "profile.team_admin": "Staf Administrasi",
+  "profile.team_instructor": "Pengajar Bahasa Jepang",
+  "profile.team_instructor_2": "Pengajar Bahasa Jepang",
+  "profile.team_ops": "Staf Operasional & Penempatan",
+  "profile.team_n1_note": "Pemegang JLPT N1, sertifikat N1A225127J",
+  "profile.cred_title": "Kredensial pengajar",
+  "profile.cred_jlpt_label": "Sertifikasi pengajar",
+  "profile.team_name_pending": "Belum dipublikasikan",
+
+  // ── Nama orang (dipakai sebagai KEY, bukan literal) ──────────────────
+  // Aturan yang dipakai di repo ini: "an identifier is invariant; a NAME or a
+  // QUANTITY is not." Nomor registrasi, alamat email dan nomor AHU WAJIB sama
+  // di kedua bahasa karena itu kunci rujukan. NAMA ORANG justru sebaliknya:
+  // perusahaan menerbitkan bentuk kana-nya sendiri, dan pembaca Jepang harus
+  // mengenali nama itu di bagan struktur. Sebelum ini nama ditulis sebagai
+  // literal di TEAM, sehingga halaman JP menampilkan enam ejaan Latin di
+  // tengah seksi yang seluruhnya berbahasa Jepang.
+  "profile.team_name_direktur": "Koirul Mustakim",
+  "profile.team_name_komisaris": "Triya Sumaryati",
+  "profile.team_name_edu_manager": "Hadi Prasojo",
+  "profile.team_name_admin": "Ayok Wahyu Saputro",
+  "profile.team_name_instructor": "Rian Hari Wijaya",
+  "profile.team_name_instructor_2": "Wiwit T Syafitri",
+
+  // Nama asisten AI. Body `siswa.*` dan `ai_cv.*` memakai カタカナ
+  // (ジェクリン), jadi judul yang tetap Latin membuat satu halaman memuat
+  // dua ejaan berbeda untuk orang yang sama.
+  "ai.name_jeklin": "Qween Jeklin",
+
+  // ── Judul section Lowongan (S3, `#loker`) ─────────────────────────────
+  // ADDED BY THE L8 GATE, not by a human noticing. `#loker` was the one section
+  // on the page with no heading at all: `LokerTable.tsx` renders a filter bar and
+  // a <table> and nothing else, and because the section is a tab PANEL its tab
+  // button ("Lowongan Loker") was carrying the name informally. So the region read
+  // as an unnamed landmark to assistive tech, and the document outline went
+  // h1 -> h2 (Kenapa Jepang?) -> straight to the table.
+  // e2e/test-landing.mjs asserts one heading per visible section; this key is the
+  // fix, and the gate is what found it.
+  "profile.loker_title": "Lowongan Terbaru",
+  "profile.loker_desc": "Daftar lowongan aktif dari mitra kami di Jepang.",
+
+  // ── Kontak & Lokasi (R1/R5, halaman 5, 8, 9) ─────────────────────────
+  "profile.contact_title": "Informasi Kontak",
+  "profile.contact_desc": "Silakan hubungi kami melalui telepon, surel, atau formulir.",
+  "profile.contact_address": "Alamat",
+  "profile.contact_phone": "Telepon",
+  "profile.contact_email": "Surel",
+  "profile.contact_located": "Lokasi",
+  "profile.loc_title": "Lokasi Kami",
+  "profile.loc_desc": "Kantor kami di Kabupaten Ponorogo, Jawa Timur.",
+  "profile.loc_open_maps": "Buka di Google Maps",
+
+  // ── Kode QR kanal kontak (#kontak) ───────────────────────────────────
+  // Three tile labels plus the three link names. The labels are brand names —
+  // identical in both languages — but they are keyed anyway so the coverage
+  // gate (i18n.keys.test.ts) validates them and a future rename is one edit.
+  // The `_aria` keys are the anchors' accessible names (data-lang-aria); the
+  // <img> `alt` is a description of the specific code and, like every gallery
+  // alt in this repo, is not a shared key.
+  "profile.qr_whatsapp": "WhatsApp",
+  "profile.qr_instagram": "Instagram",
+  "profile.qr_tiktok": "TikTok",
+  "profile.qr_whatsapp_aria": "Buka WhatsApp PT Amanah Sakura Japan",
+  "profile.qr_instagram_aria": "Buka Instagram PT Amanah Sakura Japan",
+  "profile.qr_tiktok_aria": "Buka TikTok PT Amanah Sakura Japan",
+
+  // ── Formulir kontak (public, unauthenticated) ────────────────────────
+  // Copy for the ONE unauthenticated write in the deployment. The tone is
+  // deliberately formal-Indonesian throughout, matching the rest of the page.
+  // `contact.privacy` states what happens to the number rather than asserting a
+  // policy the company has not published — it says the reply comes via WhatsApp,
+  // which is true and useful, and makes no claim about storage or sharing.
+  "contact.title": "Kirim Pesan",
+  "contact.desc": "Sampaikan pertanyaan Anda melalui formulir di bawah ini.",
+  "contact.field_nama": "Nama Lengkap",
+  "contact.field_wa": "Nomor WhatsApp",
+  "contact.field_subjek": "Subjek",
+  "contact.field_pesan": "Pesan",
+  "contact.send": "Kirim Pesan",
+  "contact.sending": "Mengirim...",
+  "contact.sent_title": "Pesan Anda sudah kami terima.",
+  // Kept on ONE line deliberately: the coverage gate (i18n.keys.test.ts) reads
+  // `"key": "value"` pairs textually, and a value split across lines reads as a
+  // key with no value — which is how this key was reported missing while the
+  // other eleven in the same block passed. Do not prettier-wrap it.
+  "contact.sent_body": "Tim kami akan menindaklanjuti melalui WhatsApp pada hari kerja. Jika Anda memerlukan jawaban lebih cepat, silakan menghubungi nomor yang tertera di samping.",
+  "contact.failed": "Pesan gagal dikirim. Silakan coba lagi atau hubungi kami melalui WhatsApp.",
+  "contact.privacy": "Balasan dikirim melalui WhatsApp pada hari kerja.",
+
+  // ── Navigasi section (landing page L4) ────────────────────────────────
+  // The desktop nav lists only sections that EXIST. "Layanan" and "Tentang" are
+  // deliberately absent: `#layanan` is still a hidden tab panel (it becomes a real
+  // section with the tab→anchor conversion in L5) and `#tentang` has no section at
+  // all yet (S7 waits on the owner's prose). A nav item pointing at a fragment that
+  // does not resolve is a link that looks live and does nothing.
+  "profile.nav_loker": "Lowongan",
+  "dossier.brand": "ASJ DOSSIER",
+  "dossier.status_stage": "Status & Tahapan",
+  "dossier.verified": "VERIFIED CANDIDATE",
+  "dossier.address_ktp": "Alamat Detail (KTP)",
+  // `#layanan` resolves as of e9317cf, which turned the Layanan tab panel into a
+  // plain Section (index.astro:156). NOTE 2026-09-25: the section bar that read
+  // `data-nav-link="layanan"` is gone (owner deleted the whole band below the
+  // hero), so nothing scroll-spies this target any more — the anchor still
+  // resolves, there is simply no rail pointing at it. Left as the reason this key
+  // exists; do not read it as a live contract.
+  // The key went in at the call site only; the dictionaries never got it.
+  "public.layanan_magang": "Program Magang",
+  "public.layanan_magang_desc": "Magang di perusahaan Jepang",
+  "public.layanan_tg_desc": "Tokutei Ginou SSW",
+  "public.layanan_tg_ssw": "Program SSW",
+  "error.fill_all": "Semua field wajib diisi!",
+  "error.password_mismatch": "Password baru tidak cocok!",
+  "error.session_expired": "Sesi expired. Silakan login kembali.",
+  "error.wrong_password": "Password salah!",
+  "error.password_changed": "Password berhasil diubah!",
+  "cvmini.save": "Simpan CV",
+  "cvmini.cancel": "Batal",
+  "cvmini.photo_label": "Pas Photo",
+  "esign.clear": "Hapus & Ulangi",
+  "esign.save": "Simpan TTD",
+  "esign.title": "Tanda Tangan Digital",
+  "ui.esign_docs": "Dokumen E-Sign",
+  "ui.esign_hint": "Klik kotak di bawah untuk mulai menggambar TTD / menulis nama di layar penuh.",
+  "ui.party1": "Pihak 1 (Kandidat)",
+  "ui.party2": "Pihak 2 (Wali)",
+  "ui.sign1": "TANDA TANGAN 1",
+  "ui.name1": "NAMA TERANG 1",
+  "ui.sign2": "TANDA TANGAN 2",
+  "ui.name2": "NAMA TERANG 2",
+  "ui.start_draw": "Mulai Gambar",
+  "ui.start_drawing": "Mulai Menggambar",
+  "ui.redo_sign": "Ulangi Gambar",
+  "ui.draw_hint": "Gunakan jari di area putih.",
+  "ui.rotate_phone": "Putar HP ke posisi landscape",
+  "ui.rotate_phone_rest": "untuk menulis nama dengan leluasa.",
+  "ui.save_all_docs": "SIMPAN SEMUA DOKUMEN",
+  "ui.toast_area_empty": "Area gambar masih kosong.",
+  "ui.toast_sign_area_required": "Isi minimal 1 area (TTD / Nama) sebelum menyimpan.",
+  "ui.toast_naitei_locked": "E-Sign & Data Naitei terbuka setelah tahapan kandidat masuk Lolos/Pemberkasan.",
+  "ui.toast_saved_server": "Data berhasil disimpan!",
+  "changepass.title": "Ganti Password",
+  "changepass.old": "Password Lama",
+  "changepass.new": "Password Baru",
+  "changepass.confirm": "Konfirmasi Password Baru",
+  "changepass.hint": "Password baru 6-20 karakter, tanpa spasi, tidak boleh sama dengan 4 digit terakhir No. WA.",
+  "changepass.btn": "Ganti Password",
+  "changepass.loading": "Memproses...",
+  "doc.preview_not_available": "Tidak bisa dipratinjau",
+  "doc.preview_hint": "Tipe file ini tidak bisa ditampilkan di preview browser",
+  "doc.preview_error": "Gagal memuat pratinjau",
+  "doc.preview_loading": "Memuat pratinjau...",
+    "toolbar.admin": "Panel Admin",
+    "toolbar.candidate": "Dashboard Kandidat",
+    "toolbar.siswa": "Pendaftaran Siswa Baru",
+    "toolbar.ai_cv": "AI CV Chat",
+    "toolbar.apply": "Form Lamaran",
+    "toolbar.master": "CV Master",
+    "toolbar.share": "Share Loker",
+    "bottomnav.cari": "Cari",
+    "bottomnav.loker": "Loker",
+    "bottomnav.pelamar": "Pelamar",
+    "bottomnav.mail": "Mail",
+    "bottomnav.wa": "WA",
+    "bottomnav.config": "Pengaturan",
+    "bottomnav.dashboard": "Dashboard",
+    "bottomnav.keluar": "Keluar",
+    "bottomnav.menu": "Menu",
+    "cv.field_nama": "Nama Lengkap",
+    "cv.field_tmp_lahir": "Tempat Lahir",
+    "cv.field_tgl_lahir": "Tgl Lahir",
+    "cv.field_usia": "Usia",
+    "cv.field_gender": "Gender",
+    "cv.field_agama": "Agama",
+    "cv.field_alamat": "Alamat Lengkap",
+    "cv.field_email": "Email Aktif",
+    "cv.field_wa": "No WA",
+    "cv.field_status_nikah": "Status Nikah",
+    "cv.field_status_nikah_jp": "Status Nikah (JP)",
+    "cv.field_pendidikan": "Pendidikan",
+    "cv.field_tb_bb": "TB / BB",
+    "cv.field_goldar": "Gol. Darah",
+    "cv.field_tgn_dominan": "Tgn Dominan",
+    "cv.field_tahan_ac": "Tanpa AC?",
+    "cv.field_mata_kanan": "Mata Kanan",
+    "cv.field_mata_kiri": "Mata Kiri",
+    "cv.field_butawarna": "Buta Warna",
+    "cv.field_bhs_jepang": "Bhs Jepang",
+    "cv.field_promo_diri": "Promosi Diri",
+    "cv.field_keahlian": "Keahlian Khusus",
+    "cv.field_alasan_bidang": "Alasan Memilih Bidang",
+    "cv.field_rencana_pulang": "Rencana Setelah Pulang",
+    "cv.field_target_pribadi": "Target Pribadi",
+    "cv.field_tujuan_jepang": "Tujuan Kerja di Jepang",
+    "cv.upload_foto": "Pas Foto",
+    "cv.upload_jft": "Sertifikat JFT",
+    "cv.upload_ssw": "Sertifikat SSW",
+    "cv.field_laka": "Kecelakaan",
+    "cv.field_riwayat_jp": "Pernah ke Jepang?",
+    "cv.field_kelebihan": "Kelebihan / 長所",
+    "cv.field_kekurangan": "Kekurangan / 短所",
+    "cv.field_lama_jp": "Lama di Jepang",
+    "cv.field_target_gaji": "Gaji (Yen)",
+    "cv.field_target_nabung": "Tabungan",
+    "cv.field_nilai_jp": "Nilai",
+    "cv.field_lisensi_ssw": "Lisensi/SSW",
+    "cv.field_kenalan_nama_id": "Nama (ID)",
+    "cv.field_kenalan_nama_jp": "Nama (JP)",
+    "cv.field_kenalan_hub_id": "Hubungan (ID)",
+    "cv.field_kenalan_hub_jp": "Hubungan (JP)",
+    "cv.field_kenalan_kerja_id": "Pekerjaan (ID)",
+    "cv.field_kenalan_kerja_jp": "Pekerjaan (JP)",
+    "cv.field_kenalan_usia": "Usia",
+    "cv.field_kenalan_alamat_id": "Alamat (ID)",
+    "cv.field_kenalan_alamat_jp": "Alamat (JP)",
+    "cv.upload_ktp": "KTP",
+    "cv.upload_kk": "Kartu Keluarga (KK)",
+    "cv.upload_ijazah_sd": "Ijazah SD",
+    "cv.upload_ijazah_smp": "Ijazah SMP",
+    "cv.upload_ijazah_sma": "Ijazah SMA",
+    "cv.upload_ijazah_univ": "Ijazah Universitas",
+    "ai_cv.sec_identitas": "1. Identitas & Kontak",
+    "ai_cv.sec_fisik": "2. Fisik & Ukuran",
+    "ai_cv.sec_medis": "3. Medis & Kebiasaan",
+    "ai_cv.sec_jiko": "4. Jiko PR & Wawancara",
+    "ai_cv.sec_pendidikan": "Pendidikan",
+    "ai_cv.sec_pekerjaan": "Pekerjaan",
+    "ai_cv.sec_keluarga": "Keluarga (KK)",
+    "ai_cv.sec_kenalan": "Kenalan di Jepang",
+    "ai_cv.dynamic_ai_data": "Data dinamis dari AI",
+    "ai_cv.row_tambah": "Tambah baris",
+    "ai_cv.row_pendidikan": "Pendidikan",
+    "ai_cv.row_pekerjaan": "Pekerjaan",
+    "ai_cv.row_keluarga": "Anggota keluarga",
+    "ai_cv.row_tingkat": "Tingkat",
+    "ai_cv.row_sekolah": "Nama Sekolah (ID)",
+    "ai_cv.row_sekolah_jp": "Nama Sekolah (JP)",
+    "ai_cv.row_jurusan": "Jurusan (ID)",
+    "ai_cv.row_jurusan_jp": "Jurusan (JP)",
+    "ai_cv.row_perusahaan": "Perusahaan (ID)",
+    "ai_cv.row_perusahaan_jp": "Perusahaan (JP)",
+    "ai_cv.row_jabatan": "Jabatan (ID)",
+    "ai_cv.row_jabatan_jp": "Jabatan (JP)",
+    // Shown inside the suggestion list of ComboSelect when nothing matches, so
+    // the candidate is told their text is being kept rather than ignored.
+    "ai_cv.combo_hint": "Ketik atau pilih dari daftar…",
+    "ai_cv.combo_manual": "Tidak ada di daftar — teks Anda tetap dipakai",
+    "ai_cv.row_hubungan": "Hubungan",
+    "ai_cv.row_nama": "Nama",
+    "ai_cv.row_katakana": "Katakana",
+    "ai_cv.row_pekerjaan_anggota": "Pekerjaan",
+    // Legacy spelled these "Bulan/Thn Masuk (入学)" / "Bulan/Thn Lulus
+    // (卒業)" — the unit is named because a period is now a month+year pair,
+    // and a bare "Masuk" reads as a different field from the school name.
+    "ai_cv.row_masuk": "Bulan/Thn Masuk",
+    "ai_cv.row_lulus": "Bulan/Thn Lulus",
+    "ai_cv.row_keluar": "Bulan/Thn Keluar",
+    // aria-labels for the two halves of MonthYearField: the visible group label
+    // covers "when", these say which control holds which half, so a screen
+    // reader does not announce two identically-named dropdowns.
+    "cv.field_month": "Bulan",
+    "cv.field_year": "Tahun",
+    "ai_cv.row_gaji": "Gaji",
+    "ai_cv.btn_saving": "Menyimpan…",
+    "ai_cv.btn_uploading": "Mengunggah dokumen…",
+    "ai_cv.btn_saving_db": "Menyimpan data…",
+    "ai_cv.btn_saved": "Tersimpan",
+    "ai_cv.manual_hint": "Edit manual aktif — koreksi langsung jika ada yang salah.",
+    "ai_cv.bot_greeting": "Halo! Saya Qween Jeklin, HRD ASJ. Saya akan membantu mengisi CV Jepangmu. Silakan ceritakan tentang dirimu!",
+    "candidate.badge_gold_title": "Master Profil Lengkap (Gold Crown)",
+    // Silver ada di sini karena DULU tidak ada: gold dan bronze sudah pakai
+    // t() di CandidateDash.tsx, tapi badge perak-nya hardcode. Jadi hanya
+    // silver yang selalu berbahasa Indonesia untuk user JP.
+    "candidate.badge_silver_title": "CV Mini Lengkap (Silver)",
+    "candidate.badge_bronze_title": "Pendaftar Terverifikasi (Bronze)",
+    // ── LevelCard: kelengkapan berkas disajikan sebagai "level" ──────────
+    // SENGAJA tidak memakai kata "skor"/"peringkat"/"XP". Angka ini mengukur
+    // KELENGKAPAN BERKAS SENDIRI, bukan peluang diterima — dan kandidat tidak
+    // boleh melihat angka yang bisa dibaca begitu. Lihat catatan di
+    // src/components/candidate/LevelCard.tsx §ATURAN.
+    "candidate.level_label": "Kelengkapan Profil",
+    "candidate.level_empty": "Belum Dimulai",
+    "candidate.level_bronze": "Terdaftar",
+    "candidate.level_silver": "Setengah Jalan",
+    "candidate.level_gold": "Profil Lengkap",
+    "candidate.level_mini": "CV Mini",
+    "candidate.level_master": "Master Profil",
+    "candidate.level_next_before": "Kurang",
+    "candidate.level_next_after": "lagi untuk naik tingkat.",
+    // ── Pemandu langkah (StepGuide.tsx) ──
+    // Satu kartu yang menjawab "apa satu hal berikutnya?". Tidak ada angka skor
+    // di sini: kata-katanya menyebut FORMULIR, bukan penilaian. Jangan tambahkan
+    // "skor", "peringkat", "peluang", atau "lolos" — lihat §6.2 di
+    // docs/ILLUSTRATION_SPEC.md dan catatan di StepGuide.tsx.
+    "candidate.step_label": "Langkah Berikutnya",
+    "candidate.step_berkas_title": "Lengkapi berkas yang kurang",
+    "candidate.step_berkas_body": "Ada berkas yang belum diunggah. Unggah sekarang supaya tidak menumpuk di akhir.",
+    "candidate.step_mini_title": "Isi data dasar di CV Mini",
+    "candidate.step_mini_body": "Mulai dari data dasar: jenis kelamin, usia, pendidikan, dan kemampuan bahasa.",
+    "candidate.step_master_title": "Lengkapi Master Profil",
+    "candidate.step_master_body": "Detail biodata, alamat, dan data paspor masih ada yang kosong.",
+    "candidate.step_done_title": "Profil kamu sudah lengkap",
+    "candidate.step_done_body": "Semua bagian sudah terisi. Periksa lowongan terbaru sambil menunggu kabar dari admin.",
+    "candidate.btn_preview_cv": "Preview Desain CV",
+    "candidate.btn_upload_revise": "Upload Revise",
+    "candidate.btn_change_pass": "Ganti Password",
+    "candidate.btn_cv_mini": "CV Mini",
+    "candidate.btn_master": "Master Profil",
+    "candidate.btn_esign": "E-Sign & Naitei",
+    "candidate.btn_schedule": "Jadwal",
+    "candidate.btn_practice": "Latihan Wawancara",
+    "candidate.btn_public": "Lihat Loker Publik",
+    "candidate.btn_chat_wa": "Chat WA Admin",
+    "ai.placeholder_wa": "WA kandidat",
+    "ai.placeholder_bidang": "Bidang SSW",
+    "ai.model_ready": "Model Wawancara siap",
+    "input.placeholder_auto": "Ketik Nama / WA untuk auto-fill...",
+    "db.placeholder_search": "Cari ID, TSK, Pekerjaan...",
+    "db.empty": "Tidak ada data.",
+    "pelamar.placeholder_search": "Find Nama, Code, Tahapan...",
+    "wa.fallback_msg": "Halo Admin ASJ, saya tertarik lowongan ",
+    "wa.fallback_msg2": "Ketik Nama Orang Tua/Wali|628xxxxxxxxxx",
+    "wa.nama_siswa": "Nama Siswa",
+    "wa.ortu_wali": "Orang Tua/Wali",
+    "admin.model_wawancara": "Model Wawancara - ",
+    "admin.close_sidebar": "Tutup sidebar",
+    "admin.search_mail": "Cari nama / WA / job...",
+    "admin.kategori": "Kategori",
+    "admin.placeholder_kategori": "MANUFAKTUR",
+    "admin.placeholder_syarat": "Usia 18-30, Minimal SMA...",
+    "admin.placeholder_ket": "Keterangan publik...",
+    "admin.placeholder_msg_tsk": "Pesan tambahan untuk TSK...",
+    "admin.placeholder_08": "08...",
+    "admin.placeholder_umum": "UMUM atau Ketik Kode",
+    "admin.announce_ph": "Ketik pengumuman di sini... (Kosongkan untuk menghapus)",
+    "admin.custom_lokasi": "Ketik manual lokasi lainnya...",
+    "admin.custom_syarat": "Ketik manual syarat lainnya...",
+    "admin.custom_dokumen": "Ketik dokumen lain...",
+    "admin.wa_undangan_title": "Undangan Grup WhatsApp Kelas",
+    "admin.wa_undangan_desc": "Kirim undangan Grup WA ke Orang Tua/Wali",
+    "admin.wa_template_name": "NAMA TEMPLATE (Kategori)",
+    "admin.wa_template_ph": "Contoh: Jadwal Interview",
+    "admin.ai_confused": "Jeklin bingung nih!",
+    "admin.ai_conn_error": "Error koneksi.",
+    "admin.ai_parse_failed": "Gagal parse.",
+    "admin.ai_score": "Skor: ",
+    "admin.ai_recommendation": "Rekomendasi: ",
+    "toast.error_prefix": "Error: ",
+    "toast.failed_prefix": "Gagal: ",
+    "cvmini.usia": "Usia",
+    "cvmini.tb": "TB (cm)",
+    "cvmini.bb": "BB (kg)",
+    "cvmini.pendidikan": "Pendidikan",
+    "cvmini.jft": "JFT Score",
+    "cvmini.ssw": "SSW Score",
+    "cvmini.ph_usia": "25",
+    "cvmini.ph_tb": "170",
+    "cvmini.ph_bb": "65",
+    "cvmini.ph_pendidikan": "SMA/SMK",
+    "cvmini.ph_jft": "A2/B1",
+    "cvmini.ph_ssw": "1/2 level",
+    "ui.unduh_file": "Unduh File",
+    "ui.unduh": "Unduh",
+    "siswa.placeholder_chat": "Ketik balasanmu di sini\u2026",
+    "wa.template_ph": "Ketik pesan atau pilih template di atas...",
+    "wa.nama_orangtua": "Orang Tua/Wali",
+    "wa.nama_siswa_ph": "Nama Siswa",
+    "wa.paste_ph": "Nama Orang Tua/Wali|628xxxxxxxxxx",
+    "cv.kelebihan": "Kelebihan",
+    "cv.kekurangan": "Kekurangan",
+    "cv.hobi": "Hobi",
+    "cv.motivasi": "Motivasi ke Jepang",
+    "master.tgl_lahir": "Tgl Lahir",
+    "master.ketik_bidang": "Ketik bidang SSW lain",
+    "ai.biodata_updated": "Biodata kandidat berhasil diperbarui!",
+    "ai.fill_wa_first": "Isi nomor WA kandidat terlebih dahulu.",
+    "ai.no_biodata": "Biodata kandidat tidak ditemukan.",
+    "ai.no_results": "Tidak ada hasil ditemukan.",
+    "ai.parse_success": "File CV berhasil diparsing!",
+    "ai.pick_file_first": "Pilih file CV terlebih dahulu.",
+    "ai.read_file_failed": "Gagal membaca file. Coba lagi.",
+    "ai.placeholder_admin": "Ketik pesan untuk Jeklin...",
+    "ai.sug_analyze": "Analisis CV",
+    "ai.sug_check_stage": "Cek Tahapan Kandidat",
+    "ai.sug_translate": "Terjemahkan Data",
+    "ai.welcome_admin": "Halo Admin! Saya Jeklin, asisten AI. Saya bisa menganalisis CV kandidat, mengecek tahapan, dan menerjemahkan data.",
+    "ai.unavailable_title": "Asisten AI sedang tidak tersedia",
+    "ai.unavailable_body": "Fitur AI mati sementara — sisa aplikasi tetap berjalan normal. Coba lagi beberapa saat lagi ya!",
+    "footer.copyright": "© 2026 PT AMANAH SAKURA JAPAN. ALL RIGHTS RESERVED.",
+  // ── Footer: navigasi cepat ────────────────────────────────────────────
+  // Five links and three column headings that carried NO key at all — the footer
+  // switch to Japanese left them in Indonesian. Only `Lowongan Kerja` was caught,
+  // because `i18n.keys.test.ts`'s bare-text scan reports the odd one out and the
+  // other seven read as "Indonesian copy that was never translated" rather than
+  // as a defect. They are the same defect; all eight get keys.
+  //
+  // Values match the visible literals verbatim. `Alur Pendaftaran` is shortened
+  // from the nav's `Alur` deliberately: the footer link is a wider column and the
+  // longer label is what the footer shipped with.
+  "footer.nav_heading": "Navigasi",
+  "footer.nav_program": "Program",
+  "footer.nav_alur": "Alur Pendaftaran",
+  "footer.nav_fasilitas": "Fasilitas",
+  "footer.nav_tentang": "Tentang Kami",
+  "footer.social_heading": "Sosial Media",
+  "footer.contact_heading": "Kontak",
+  // The paragraph directly UNDER the tagline. It rendered on every page with
+  // `showFooter` and carried no key, so it stayed Indonesian in Japanese mode
+  // even though the tagline above it is Japanese-only by design — the two sit
+  // six lines apart in Footer.astro. Found 2026-09-27 by the bilingual probe.
+  "footer.blurb": "LPK pelatihan bahasa & budaya kerja Jepang di Ponorogo. Penempatan dijalankan bersama mitra LPK dan PT (SO) melalui MoU.",
+    "footer.tagline": "夢を日本へ",
+    "footer.title": "PT Amanah Sakura Japan",
+    "form.mf_alkohol": "Minum Alkohol?",
+    "form.mf_anak": "Jumlah Anak",
+    "form.mf_ssw2": "Sertifikat Lisensi / SSW 2 (特定技能)",
+    "login.nama_ph": "Nama lengkap (sesuai KTP)",
+    "master.ketik_bidang2": "Ketik bidang SSW lain (2)",
+    "toast.draft_saved": "Draft berhasil disimpan!",
+    "toast.failed": "Gagal menyimpan data.",
+    "toast.link_copied": "Link berhasil disalin!",
+    "toast.wa_copied": "Pesan WA berhasil disalin!",
+    "ui.checking": "Memeriksa...",
+    "ui.click_zoom": "Klik untuk memperbesar",
+    "ui.no_students": "Belum ada siswa yang mendaftar.",
+    "ui.share_card_title": "DOKUMEN SHARE LOKER",
+    "ui.toast_master_incomplete": "Profil Master belum lengkap.",
+    "ui.toast_server_conn_failed": "Gagal terhubung ke server.",
+    "ui.wa_open_send": "Buka WhatsApp & Kirim",
+    "ui.manual_or_template": "-- Ketik Manual / Pilih Template --",
+    "ui.toast_wa_invalid_cand2": "Nomor WA kandidat tidak valid!",
+    "ui.send_wa_call": "Kirim WA Panggilan",
+    "ui.toast_wa_template_saved": "Template WA tersimpan!",
+    "ui.manage_wa_templates": "Kelola Template WA Pintar",
+    "ui.new_template": "Buat Template Baru",
+    "ui.template_name": "NAMA TEMPLATE (Kategori)",
+    "ui.template_message": "ISI PESAN WA",
+    "ui.template_code_hint": "<strong>Gunakan Kode Ini:</strong><br> &lt;&lt;NAMA&gt;&gt; = Nama Kandidat<br> &lt;&lt;JOB&gt;&gt; = Job yg dilamar<br>",
+    "ui.template_saved": "Template Tersimpan",
+    "ui.template_edit_title": "Edit Template",
+    "ui.template_edit": "Edit",
+    "ui.template_delete": "Hapus",
+    "ui.template_empty": "Belum ada template. Silakan buat di form sebelah kiri.",
+    "ui.save_template": "Simpan Template",
+    "ui.toast_error_prefix": "Error: ",
+    "ui.featured_badge": "Fitur Khusus",
+    "ui.invite_class_wa_desc": "Kirim undangan Grup WA ke Orang Tua/Wali secara massal \u2014 tempel daftar <span class=\"font-mono text-emerald-400\">Nama|WA</span>, isi link grup + pesan (varian dipisah <span class=\"font-mono text-emerald-400\">---</span> bergilir anti-ban), lalu kirim.",
+    "ui.kandidat_tujuan": "KANDIDAT TUJUAN",
+    "ui.pilih_template_pesan": "PILIH TEMPLATE PESAN",
+    "ui.isi_pesan_custom": "ISI PESAN (Bisa Diedit / Custom)",
+    "ui.ketik_pesan_ph": "Ketik pesan atau pilih template di atas...",
+    "ui.memuat_template": "Memuat template...",
+    "ui.confirm_delete_template": "Yakin ingin menghapus template ini?",
+    "ui.template_deleted": "Template dihapus",
+    "admin.wa_template_name_wajib": "Nama template wajib diisi.",
+    "admin.wa_template_ph_nama": "Contoh: Jadwal Interview",
+    "admin.wa_template_ph_isi": "Konnichiwa <<NAMA>>,\nJadwal interview untuk posisi <<JOB>>...",
+    "ui.preview_unavailable_hint": "Tipe file ini tidak bisa ditampilkan di preview browser — gunakan tombol Unduh.",
+    "ui.download": "Unduh",
+    "ui.preview_load_failed": "Gagal memuat pratinjau",
+    "ui.preview_admin_only_download": "Hanya admin yang bisa mengunduh file ini",
+    "ui.open_cv": "BUKA CV",
+    "ui.open_jft": "BUKA JFT",
+    "ui.open_ssw": "BUKA SSW",
+    "ui.open_photo": "BUKA FOTO",
+    "share.age_all": "Semua Usia",
+    "share.age_yr": "thn",
+    "share.empty_msg": "Kandidat untuk job ini akan muncul di sini.",
+    "share.empty_title": "Belum Ada Kandidat",
+    "share.err_msg": "Silakan periksa kembali link yang diberikan.",
+    "share.err_title": "Akses Ditolak",
+    "share.filter": "Filter:",
+    "share.gen_all": "Semua Gender",
+    "share.gen_l": "Laki-laki (L)",
+    "share.gen_p": "Perempuan (P)",
+    "share.gender_f": "P",
+    "share.gender_m": "L",
+    "share.jft_all": "Semua Level JFT",
+    "share.link_pending": "Menyiapkan link…",
+    "share.secure_title": "Secure Candidate Viewer",
+    "share.sel_btn": "Kirim Pilihan",
+    "share.sel_count": "Kandidat Terpilih",
+    "share.select": "Pilih",
+    "share.wa_closing": "Mohon tindak lanjutnya. Terima kasih.",
+    "share.wa_greet": "Halo Admin ASJ, kami tertarik dengan kandidat berikut untuk Job",
+    "ui.select_cv_template": "PILIH TEMPLATE CV",
+    "ui.generating_cv": "Sedang generate CV...",
+    "button.pilih_template_cv": "Pilih Template CV",
+
+    // ─── MasterFullForm: previously hardcoded Indonesian ─────────────────────
+    // These rendered in Indonesian even for JP users, because they were literal
+    // text in the JSX rather than t() lookups. Grouped by section so the form's
+    // screens read in order (identitas → medis → riwayat → keluarga → dokumen).
+    "master.form_brand": "ASJ DOSSIER",
+    "master.form_sub": "MASTER DATABASE SYSTEM",
+    "master.section_identitas": "Identitas Dasar",
+    "master.section_medis": "Catatan Medis",
+    "master.edu_jenjang": "Jenjang",
+    "master.edu_sma": "SMA/SMK",
+    "master.edu_sekolah": "Nama Sekolah",
+    "master.edu_tahun_awal": "Tahun Awal",
+    "master.edu_tahun_akhir": "Tahun Akhir",
+    "master.edu_jurusan": "Jurusan",
+    "master.edu_alamat": "Alamat Sekolah",
+    "master.edu_tambah": "Tambah Pendidikan",
+    "master.kerja_perusahaan": "Perusahaan",
+    "master.kerja_jabatan": "Jabatan",
+    "master.kerja_tahun_awal": "Tahun Awal",
+    "master.kerja_tahun_akhir": "Tahun Akhir",
+    "master.kerja_alasan": "Alasan Berhenti",
+    "master.kerja_tambah": "Tambah Pekerjaan",
+    "master.fam_hubungan": "Hubungan",
+    "master.fam_saudara": "Saudara",
+    "master.fam_lainnya": "Lainnya",
+    "master.fam_pekerjaan": "Pekerjaan",
+    "master.fam_tambah": "Tambah Keluarga",
+    "master.fam_title": "Anggota Keluarga (Maks 5)",
+    "master.fam_member": "Keluarga",
+    "master.status_passport": "Status & Paspor",
+    "master.upload_doc_max": "Upload Dokumen (MAX 2MB)",
+    "master.darurat_title": "Kontak Darurat (Wajib)",
+    "master.darurat_nama": "Nama Kontak Darurat",
+    "master.darurat_hubungan": "Hubungan",
+    "master.darurat_wa": "No. WA Darurat",
+    "master.kenalan_title": "Kenalan di Jepang",
+    "master.kenalan_nama": "Nama Kenalan",
+    "master.kenalan_hubungan": "Hubungan",
+    "master.kenalan_pekerjaan": "Pekerjaan",
+    "master.kenalan_alamat": "Alamat di Jepang",
+    "master.next": "Lanjut",
+    "master.ph_usia_sma": "Usia 18-30, Minimal SMA...",
+    "master.ph_istri_ortu": "Istri / Orang Tua",
+    "master.ph_kosongkan": "Kosongkan jika tidak ada",
+    "master.ph_kosongkan_belum": "Kosongkan jika belum punya",
+    "master.ph_misal_30": "Misal: 30",
+    "master.ph_teman_saudara": "Teman / Saudara",
+    "master.ph_karyawan_mahasiswa": "Karyawan / Mahasiswa",
+    "master.ph_kota_prefektur": "Kota / Prefektur (Otomatis diterjemahkan)",
+
+    // ─── Admin forms: previously hardcoded Indonesian ────────────────────────
+    "admin.contoh_keterangan": "Keterangan publik...",
+    "admin.ph_grup_wa": "Link Grup WA (https://chat…)",
+    "admin.ph_jeda_pesan": "Jeda antar pesan (detik)",
+    "admin.ph_umum_kode": "UMUM atau Ketik Kode",
+    "admin.ph_feedback": "Feedback/catatan untuk kandidat...",
+    "admin.edit_data_kandidat": "Edit Data Kandidat",
+    "admin.upload_dokumen": "Upload Dokumen",
+    "admin.edit_gender": "Gender",
+    "admin.edit_tb": "TB (cm)",
+    "admin.edit_bb": "BB (kg)",
+    "admin.edit_tempat_lahir": "Tempat Lahir",
+    "admin.edit_tgl_lahir": "Tanggal Lahir",
+    "admin.edit_pendidikan": "Pendidikan",
+    "admin.edit_jft": "JFT / JFJ",
+    "admin.edit_ssw": "SSW / Bidang",
+    "admin.edit_tahapan": "Tahapan",
+    "admin.edit_status": "Status",
+    "admin.edit_catatan_ext": "Catatan External (untuk kandidat)",
+    "admin.manual_cari_title": "CARI KANDIDAT TERDAFTAR (Opsional)",
+    "admin.manual_nama": "NAMA LENGKAP",
+    "admin.manual_wa": "NO WHATSAPP",
+    "admin.manual_job": "JOB DILAMAR (KODE)",
+    "admin.manual_perempuan": "PEREMPUAN",
+    "admin.manual_tinggi": "Tinggi (CM)",
+    "admin.manual_berat": "Berat (KG)",
+    "admin.manual_pendidikan": "PENDIDIKAN",
+    "admin.manual_pas": "PAS PHOTO (JPG/PNG)",
+    "admin.manual_cv": "CV / RIREKISHO (PDF/Excel/Word)",
+    "admin.manual_jft_pdf": "JFT (PDF)",
+    "admin.manual_ssw_pdf": "SSW (PDF)",
+    "admin.manual_jenis_doc": "JENIS DOKUMEN",
+    "admin.manual_file": "FILE (PDF/Gambar)",
+    "admin.manual_empty": "Tidak ada kandidat di job ini.",
+    "admin.rirekisho_title": "DAFTAR RIWAYAT HIDUP",
+    "admin.jadwal_loading": "Memuat jadwal...",
+    "admin.jadwal_none": "Belum ada jadwal terdekat.",
+    "admin.jadwal_nama": "NAMA AGENDA",
+    "admin.jadwal_id_loker": "ID LOKER",
+    "admin.jadwal_lokasi": "LOKASI / MEDIA ZOOM",
+    "admin.jadwal_pengurus": "PENGURUS (TSK)",
+    "admin.jadwal_link": "LINK TAUTAN ZOOM (Opsional)",
+    "admin.jadwal_col_id": "ID Jadwal",
+    "admin.jadwal_col_agenda": "Agenda",
+    "admin.jadwal_col_job": "Job / Waktu",
+    "admin.jadwal_col_lokasi": "Lokasi / Link",
+    "admin.jadwal_empty": "Tidak ada jadwal",
+
+    // ─── Password / CV mini / misc helpers ───────────────────────────────────
+    "ui.ph_6_20_karakter": "6-20 karakter",
+    "ui.ph_jft_level": "A2 / 120",
+    "ui.ph_ssw_bidang": "Kaigo, Pertanian",
+    "ui.ph_id": "ID...",
+    "ui.ph_jp": "JP...",
+    "ui.ph_misal_30": "Misal: 30",
+    "admin.jadwal_link_zoom": "Link Zoom",
+    "ui.redirecting_login": "Mengalihkan ke halaman login...",
+    "ui.access_denied_redirect": "Akses ditolak. Mengalihkan...",
+    "ui.upload_custom_template": "Upload Template Kustom",
+    "ui.crash_title": "Terjadi Kesalahan (Crash)",
+    "form.nomor_wa": "Nomor WhatsApp",
+
+    // ─── Tooltip (title=) — dulu hardcode di atribut ─────────────────────────
+    // Atribut mentah TIDAK terlihat oleh guard cakupan kamus (ia hanya memindai
+    // t(), data-lang, dan literal berbentuk kunci), jadi teks ini selalu
+    // berbahasa Indonesia tanpa pernah memerahkannya. Semuanya terlihat user.
+    "admin.tt_lihat_profil": "Lihat profil/CV kandidat",
+    "admin.tt_chat_wa": "Chat WA",
+    "admin.tt_riwayat_kandidat": "Riwayat kandidat",
+    "admin.tt_tandai_gagal": "Tandai gagal & lepas dari job",
+    "admin.tt_segera_hadir": "Segera hadir",
+    "landing.tt_grup_wa": "Join Grup WhatsApp",
+    "landing.tt_cek_kandidat": "Cek List Kandidat Terdaftar",
+    "ui.alt_pratinjau": "Pratinjau",
+    "ui.alt_pamflet": "Pamflet",
+
+    // ─── 404 (src/pages/404.astro) ───────────────────────────────────────────
+    // Added with the page itself. Every data-lang key must exist in BOTH
+    // dictionaries or i18n.keys.test.ts fails, which is the point: a key that
+    // only exists in `id` renders the key string itself in Japanese.
+    "notfound.title": "Halaman tidak ditemukan",
+    "notfound.body": "Alamat yang Anda buka tidak ada atau sudah dipindahkan. Periksa kembali tautannya, atau mulai dari halaman lowongan.",
+    "notfound.home": "Ke Beranda",
+    "notfound.jobs": "Lihat Lowongan",
+
+    // ─── Document titles / <title> ───────────────────────────────────────────
+    // WHY THESE EXIST SEPARATELY FROM THE `title=` PROP ON BaseLayout.
+    //
+    // The <title> tag is SERVER-RENDERED on purpose (see BaseLayout.astro): a
+    // crawler and a shared link preview need it in the HTML, and
+    // translateDataLang() only runs in the browser. So the server-rendered
+    // value stays Indonesian, and that part is correct and unchanged.
+    //
+    // But nothing ever updated it AFTER hydration, so a reader who chose
+    // Japanese kept an Indonesian title in the tab, the bookmark and the
+    // history entry — verified 2026-09-27 by loading all 7 routes twice and
+    // comparing document.title: 7 of 7 were identical. That is why these keys
+    // exist: BaseLayout reads `data-title-key` off <html> and assigns
+    // document.title from this dictionary on boot and on every toggle.
+    //
+    // THE KEY LIVES ON <html>, NOT ON <title>. i18n.keys.test.ts does not parse
+    // <title>, but another gate matches `/<title>([\s\S]*?)<\/title>/`, and
+    // adding an attribute to that tag would break it. Same reasoning the skill
+    // for this defect class records.
+    "doc.title_home": "PT Amanah Sakura Japan — Job Portal",
+    "doc.title_loker": "Lowongan Kerja — PT Amanah Sakura Japan",
+    "doc.title_public": "Lowongan & Layanan — ASJ Portal",
+    "doc.title_apply": "ASJ - Form Lamaran Kerja",
+    "doc.title_ai_cv": "ASJ AI - Qween Jeklin",
+    "doc.title_siswa_baru": "ASJ - Pendaftaran Siswa (AI Assistant)",
+    "doc.title_admin": "Panel Admin — ASJ Portal",
+    "doc.title_candidate": "Dashboard Kandidat — ASJ Portal",
+    "doc.title_notfound": "Halaman tidak ditemukan — ASJ Portal",
+    // Ditemukan oleh gate `every <BaseLayout title> carries a titleKey` di
+    // i18n.keys.test.ts, bukan oleh mata. Dua halaman ini melewatkan titleKey
+    // sepenuhnya, jadi judulnya tetap Indonesia di halaman JP — dan tidak ada
+    // gate lain di repo yang bisa melihat kondisi itu.
+    "doc.title_master": "ASJ Master Profil",
+    "doc.title_share": "ASJ - Candidate Viewer",
+
+    // ─── Theme + language toggles (src/components/forms/FormToolbar.tsx) ────
+    // These were hardcoded English (`Dark` / `Light`) and hardcoded Indonesian
+    // aria-labels on an island, so they never translated — measured 2026-09-27
+    // on /apply, /ai-cv and /siswa-baru. The visible label is only shown at
+    // `sm:` and up; the aria-label is the string assistive tech actually reads,
+    // so an untranslated aria-label is the more serious of the two.
+    "theme.dark": "Gelap",
+    "theme.light": "Terang",
+    "theme.to_light": "Aktifkan tema terang",
+    "theme.to_dark": "Aktifkan tema gelap",
+    "lang.to_jp": "Ganti ke bahasa Jepang",
+    "lang.to_id": "Ganti ke bahasa Indonesia",
+  },
+  jp: {} as Record<string, string>, // P9: lazy-loaded from i18n-jp.ts
+
+};
+
+// P9 fix: Preload jp translations when user switches to Japanese.
+// On init, if lang is already jp, preload immediately so translations
+// are available before first render.
+// P9b: once the dict is installed, notify subscribers (jpReady -> App re-render)
+// and re-patch static [data-lang] nodes so the UI actually switches to Japanese.
+const RAW_STRING_TRANSLATIONS: Record<Lang, Record<string, string>> = {
+  id: {},
+  jp: {
+    "File revisi berhasil diupload!": "修正ファイルが正常にアップロードされました！",
+    "Gagal upload": "アップロードに失敗しました",
+    "Sesi tidak valid. Silakan login kembali.": "セッションが無効です。再度ログインしてください。",
+    "Sesi expired. Silakan login kembali.": "セッションの有効期限が切れました。再度ログインしてください。",
+    "Berhasil! Silakan login.": "登録が完了しました！ログインしてください。",
+    "Login gagal": "ログインに失敗しました",
+    "Registrasi gagal": "登録に失敗しました",
+    "Data berhasil disimpan!": "データが保存されました！",
+    "Data berhasil dikirim!": "送信が完了しました！",
+    "Data berhasil dihapus.": "データが削除されました。",
+    "Link berhasil disalin!": "リンクをコピーしました！",
+    "Pesan WA berhasil disalin!": "メッセージをコピーしました！",
+    "Supabase belum dikonfigurasi": "データベースが設定されていません",
+    "Network error": "ネットワークエラー",
+    "Dokumen berhasil disimpan!": "書類が保存されました！",
+    "Gagal menyimpan data.": "データの保存に失敗しました。",
+    "Gagal memuat data. Tekan Muat Ulang.": "データの読み込みに失敗しました。再読み込みしてください。",
+    "Mohon lengkapi field yang benar.": "必須項目を正しく入力してください。",
+    "Fitur terkunci untuk akun ini.": "この機能はロックされています。",
+    "Tutup notifikasi": "通知を閉じる",
+    "Kembali ke Portal": "ポータルに戻る",
+    "Lowongan Loker": "求人一覧",
+    "Program & Layanan ASJ": "ASJプログラム・サービス",
+    "AI CV Master Assistant": "AI履歴書作成アシスタント",
+  },
+};
+
+function onJpReady() {
+  jpReady.set(true);
+  translateDataLang();
+  // MUST re-apply the title here too, and the reason is a COLD-LOAD RACE that
+  // makes the first attempt fail silently.
+  //
+  // Order of events on a cold load with lang=jp:
+  //   1. langStore.subscribe fires. `translations.jp` is still EMPTY, so the
+  //      branch calls loadJp() (async) and SKIPS translateDataLang().
+  //   2. It dispatches `asj-lang-change` immediately, so BaseLayout's listener
+  //      runs applyDocTitle() — while the JP dict is still in flight.
+  //   3. t() therefore falls back to the INDONESIAN entry, which is the same
+  //      string already in the DOM, so the assignment is a silent no-op.
+  //   4. The chunk lands and onJpReady() runs. Before this line existed it
+  //      refreshed only [data-lang] ELEMENTS; `document.title` is not an
+  //      element, so nothing ever re-applied it.
+  // Net effect: the title stayed Indonesian for every Japanese reader, while
+  // every other string on the page translated correctly — which is exactly the
+  // asymmetry the probe measured.
+  applyDocTitle();
+}
+
+/** Preload JP dictionary so language toggle is 0ms instant without network waiting */
+export function preloadJpDict(): void {
+  if (typeof window !== 'undefined') {
+    loadJp().then(onJpReady).catch(() => {});
+  }
+}
+
+if (typeof window !== 'undefined') {
+  // Preload JP dictionary immediately on client boot
+  loadJp().then(onJpReady).catch(() => {});
+
+  langStore.subscribe((lang) => {
+    if (lang === 'jp' && Object.keys(translations.jp).length === 0) {
+      loadJp().then(onJpReady).catch(() => {});
+    } else {
+      translateDataLang();
+    }
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = lang === 'jp' ? 'ja' : 'id';
+      window.dispatchEvent(new CustomEvent('asj-lang-change', { detail: { lang } }));
+    }
+  });
+}
+
+/** Translate all [data-lang], [data-lang-placeholder], [data-lang-title], and [data-lang-aria] elements in the DOM */
+export function translateDataLang() {
+  if (typeof document === "undefined") return;
+  const lang = langStore.get();
+  const dict = translations[lang] || translations.id;
+  const fallback = translations.id;
+
+  document.querySelectorAll("[data-lang]").forEach((el) => {
+    const key = el.getAttribute("data-lang");
+    if (key) {
+      const text = dict[key] || fallback[key] || RAW_STRING_TRANSLATIONS[lang]?.[key] || key;
+      if (text !== key) el.textContent = text;
+    }
+  });
+
+  document.querySelectorAll("[data-lang-placeholder]").forEach((el) => {
+    const key = el.getAttribute("data-lang-placeholder");
+    if (key) {
+      const text = dict[key] || fallback[key] || RAW_STRING_TRANSLATIONS[lang]?.[key] || key;
+      if (text !== key) el.setAttribute("placeholder", text);
+    }
+  });
+
+  document.querySelectorAll("[data-lang-title]").forEach((el) => {
+    const key = el.getAttribute("data-lang-title");
+    if (key) {
+      const text = dict[key] || fallback[key] || RAW_STRING_TRANSLATIONS[lang]?.[key] || key;
+      if (text !== key) el.setAttribute("title", text);
+    }
+  });
+
+  document.querySelectorAll("[data-lang-aria]").forEach((el) => {
+    const key = el.getAttribute("data-lang-aria");
+    if (key) {
+      const text = dict[key] || fallback[key] || RAW_STRING_TRANSLATIONS[lang]?.[key] || key;
+      if (text !== key) el.setAttribute("aria-label", text);
+    }
+  });
+}
+
+export function t(key: string): string {
+  const lang = langStore.get();
+  return translations[lang]?.[key] || translations.id[key] || RAW_STRING_TRANSLATIONS[lang]?.[key] || key;
+}
+
+/**
+ * applyDocTitle() — keep `document.title` in step with the active language.
+ *
+ * THE DEFECT THIS FIXES, measured 2026-09-27. `BaseLayout.astro` renders
+ * `<title>{title}</title>` on the server, deliberately: a crawler and a shared
+ * link preview need the title in the HTML, and this function cannot run for
+ * them. But NOTHING re-applied it after hydration, so the server-rendered
+ * Indonesian string was also the only string a Japanese reader ever saw — in
+ * the tab, the bookmark and the history entry. Loading all 7 public routes in
+ * both languages and diffing `document.title` gave **7 of 7 identical**.
+ *
+ * `i18n.keys.test.ts` had this covered and explicitly exempted it, on the
+ * reasoning that "translateDataLang() only runs in the browser, so it cannot
+ * fix these — deliberately out of scope, not a false negative". The mechanism
+ * was described correctly and the conclusion did not follow: the title is not
+ * unfixable, it just needs its own writer. The exemption is what let this
+ * survive every gate.
+ *
+ * WHY THE KEY IS READ FROM <html> AND NOT <title>. A separate gate matches
+ * `/<title>([\s\S]*?)<\/title>/`; putting an attribute on that tag would break
+ * it. `data-title-key` on the root element is invisible to that regex and is
+ * already the idiom this layout uses for its other i18n attributes.
+ *
+ * THE SERVER-RENDERED VALUE IS NOT OVERWRITTEN UNTIL A TRANSLATION EXISTS. If
+ * the JP dictionary chunk has not arrived yet, `t()` falls back to the
+ * Indonesian entry — which is the same string already in the DOM, so assigning
+ * it is a no-op rather than a flash of a raw key. A missing key is skipped for
+ * the same reason: better an Indonesian title than the literal `doc.title_x`.
+ */
+export function applyDocTitle(): void {
+  if (typeof document === "undefined") return;
+  const el = document.documentElement;
+  const key = el.getAttribute("data-title-key");
+  if (!key) return;
+  const text = t(key);
+  // t() returns the key itself when it is in NO dictionary — never render that.
+  if (text && text !== key) document.title = text;
+}
+
+/**
+ * useLang() — the ONE way an island subscribes to the active language.
+ *
+ * WHY IT SUBSCRIBES TO TWO STORES. `langStore` already reads "jp" the instant
+ * the page boots (it comes from localStorage), but `translations.jp` is a lazy
+ * chunk that lands LATER. An island that subscribes only to `langStore`
+ * therefore renders the Indonesian fallback on a COLD load with lang=jp, and
+ * never re-renders when the chunk arrives — because nothing it listens to
+ * changes. Toggling the language by hand hides this: the toggle mutates
+ * `langStore`, which re-renders every island, so every interactive test passes
+ * on a page that is wrong for a returning Japanese reader. `jpReady` bumps
+ * exactly once, when the dictionary is installed, and is the missing signal.
+ *
+ * WHY A HOOK AND NOT A `jpReady.subscribe` IN EACH ROOT. An island root is the
+ * component handed to `client:only`/`client:load`; its children re-render with
+ * it, so only the root needs the subscription. But a raw subscribe line is
+ * exactly what the next island forgets. This hook is exported from the same
+ * module an island already imports `t` from, so following the existing pattern
+ * (`const lang = useLang()`) gets the fix for free.
+ *
+ * Prefer this over `useStore(langStore)` anywhere a component renders `t()`.
+ */
+export function useLang(): Lang {
+  const lang = useStore(langStore);
+  useStore(jpReady); // re-render when the lazy JP dictionary finishes loading
+  return lang;
+}
+
+/** Centralized instant language toggle helper */
+export async function toggleLang(): Promise<Lang> {
+  const current = langStore.get();
+  const next: Lang = current === "id" ? "jp" : "id";
+  if (next === "jp") {
+    await ensureJpLoaded();
+  }
+  langStore.set(next);
+  return next;
+}
