@@ -78,17 +78,21 @@ jadi adapter itu hanya jadi dependensi yang tidak membeli apa pun.
 src/
   pages/index.astro          halaman profil perusahaan — satu-satunya rute
   pages/404.astro            halaman tidak-ditemukan
+  pages/robots.txt.ts        /robots.txt — endpoint, karena butuh origin absolut
+  pages/sitemap.xml.ts       /sitemap.xml — satu URL, lihat catatannya
   layouts/BaseLayout.astro   <head>, tema, i18n, service worker, JSON-LD, hreflang
   components/App.tsx         hero, header, dan drawer navigasi (island)
   components/public/*        seksi-seksi halaman (galeri, mitra, FAQ, kontak, …)
   components/ui/*            Icon, Button, dan primitif bersama
+  icons/sprite.svg           sprite ikon — di-inline ke setiap halaman
+  icons/sprite-map.ts        nama ikon → id simbol; harus sinkron dengan sprite
   lib/companyProfile.ts      DATA perusahaan — sumber kebenaran untuk teks
   lib/{gallery,partners,faq,testimonials,siteMeta}.ts
   store/i18n.ts, i18n-jp.ts  kamus Indonesia + Jepang
   styles/*.css               global, theme, layout, motion
 public/
   assets/                    foto fasilitas & galeri, ilustrasi, logo mitra
-  icons/                     favicon, ikon PWA, lambang ASJ, sprite
+  icons/                     favicon, ikon PWA, lambang ASJ
 docs/
   COMPANY_PROFILE_DATA.md    data resmi perusahaan + aturan §11.2
   ILLUSTRATION_SPEC.md       spek ukuran & isi ilustrasi
@@ -99,6 +103,25 @@ scripts/
   build-sw-manifest.mjs           tulis ulang precache service worker
   ci/verify-assets.mjs            gate §11.2
 ```
+
+### Menambah ikon
+
+`sprite.svg` di-inline ke **setiap** halaman, jadi ukurannya bagian dari HTML —
+bukan permintaan terpisah. Sprite-nya sudah dipangkas ke ikon yang benar-benar
+dipakai; generator aslinya (`npm run icons`) tidak ada di repo ini.
+
+Menambah ikon berarti menambah `<symbol>` di `sprite.svg` **dan** entri di
+`sprite-map.ts`. Keduanya harus sinkron: kalau entri ada tapi simbolnya tidak,
+`Icon.tsx` merender elemen kosong dan hanya memperingatkan di mode dev — ikon
+kosong tanpa suara di produksi. Ambil path datanya dari sprite portal, jangan
+tulis tangan.
+
+Untuk memeriksa ulang mana yang masih terjangkau, jalankan pemangkasnya
+(`.tmp-sprite-prune.mjs`, disimpan sebagai skill `svg-sprite-prune`). Aturannya
+sengaja longgar: sebuah ikon dipertahankan bila namanya muncul sebagai literal
+di mana pun di `src/` — nama ikon juga datang lewat objek data, dan `Icon.tsx`
+membangun `#fas-${name}` saat runtime, jadi nama yang lewat prop tidak terlihat
+oleh pemindaian markup saja.
 
 ---
 

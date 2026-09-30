@@ -375,12 +375,28 @@ const orgJsonLd = jsonLdScript(
      repaints per toggle. 200ms is still smooth (the curve is out-expo,
      which lands early) and cuts the repaint work by 60%. -->
 <body id="asj-body" class="bg-canvas text-fg min-h-screen transition-colors duration-200 flow-root">
-  <div id="global-loader" style="display: none !important;">
-    <svg class="asj-icon animate-spin text-5xl text-pink-500 mb-4" width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false"><use href="#fas-spinner" /></svg>
-    <h2 class="text-xl font-bold tracking-widest text-slate-200" data-lang="ui.loader_title">MEMUAT ASJ OS V7...</h2>
-    <p id="loader-msg" class="text-sm text-slate-500 mt-2 mb-6" data-lang="ui.loader_msg">Mempersiapkan UI Modern</p>
-    <button onclick="document.getElementById(&quot;global-loader&quot;).style.display=&quot;none&quot;" class="px-6 py-2.5 bg-red-600 hover:bg-red-500 border border-red-500 rounded-full text-sm font-bold text-white transition-colors shadow-lg"><svg class="asj-icon mr-1" width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false"><use href="#fas-times" /></svg> <span data-lang="ui.force_close_loading">Tutup Paksa Loading</span></button>
-  </div>
+  <!-- `#global-loader` WAS HERE AND IS GONE (removed 2026-09-30).
+       It was the portal's full-screen boot overlay: a spinner, the heading
+       "MEMUAT ASJ OS V7…", and a "Tutup Paksa Loading" escape button. Three
+       reasons it could not stay on a public company-profile page:
+
+         · It was UNREACHABLE. The element carried an inline
+           `display: none !important`, and grep for `global-loader` across src/
+           returned exactly three hits: that markup, its own close button, and a
+           z-index comment in ui/overlay-root.ts. Nothing ever showed it, so it
+           was dead markup — and an inline `!important` cannot be overridden by
+           a stylesheet, so it could not have been shown by CSS either.
+
+         · It carried PORTAL BRANDING into a public page's HTML source. "ASJ OS
+           V7" is the internal portal's product name; it has no meaning to a
+           visitor of a company profile, and it shipped in every page's markup
+           whether or not anything rendered it.
+
+         · It was the only reason `#loader-msg` and two `data-lang` keys
+           (`ui.loader_title`, `ui.loader_msg`, `ui.force_close_loading`)
+           existed. Those keys are removed from both dictionaries with it, so
+           this deletion also removed three strings a translator would otherwise
+           have had to maintain for a screen nobody sees. -->
   <div id="sakura-particles" class="fixed inset-0 u-modal-shell overflow-hidden hidden" aria-hidden="true"></div>
   <a href="#main-content" class="skip-link"><span data-lang="ui.skip_to_content">Lewati ke konten utama</span></a>
   
